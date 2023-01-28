@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="product_template_only_form_view_inherit_marketplace" model="ir.ui.view">
+        <field name="name">product.template.product.form.view.inherit.marketplace</field>
+        <field name="model">product.template</field>
+        <field name="priority" eval="8" />
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='group_standard_price']" position="after">
+               <group name="tradevine" string="Trademe">
+                    <field name="marketplace_brand_id"/>
+                    <field name="marketplace_photo_id"/>
+                    <field name="is_manual_order_approval_needed"/>
+                    <field name="marketplace_enable_inventory"/>
+               </group>
+            </xpath>
+            <xpath expr="//group[@name='tradevine']" position="after">
+               <group name="themarket" string="TheMarket">
+                    <field name="themarket_brand_id"/>
+                    <field name="themarket_category_id" />
+               </group>
+            </xpath>
+            
+            <xpath expr="//notebook" position="inside">
+                <page string="Marketplace Config" name="marketplace_config_ids">
+                    <field name="marketplace_config_ids" options="{'no_open': True}" readonly="0" nolabel="1" force_save="1">
+                        <tree editable="top">
+                            <field name="product_template_id" invisible="1" force_save="1"/>
+                            <field name="config_id" force_save="1"/>
+                            <field name="name" force_save="1"/>
+                            <field name="ref_code" force_save="1"/>
+                        </tree>
+                    </field>
+                </page>
+                <page string="TradeMe Listing Rule" name="trade_me_listing_rule_ids">
+                    <field name="trade_me_listing_rule_ids" nolabel="1"/>
+                </page>
+                <page string="TheMarket Listing Rule" name="themarket_listing_rule_ids">
+                    <field name="themarket_listing_rule_ids" nolabel="1"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="model_product_action_post_product_template_data" model="ir.actions.server">
+        <field name="name">Create/Update Product on Marketplace</field>
+        <field name="model_id" ref="sale.model_product_template"/>
+        <field name="binding_model_id" ref="sale.model_product_template"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_post_product_data_on_marketpalce()</field>
+    </record>
+
+    <record id="model_product_action_post_product_data" model="ir.actions.server">
+        <field name="name">Create/Update Product on Marketplace</field>
+        <field name="model_id" ref="sale.model_product_product"/>
+        <field name="binding_model_id" ref="sale.model_product_product"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_post_product_data_on_marketpalce()</field>
+    </record>
+
+</odoo>

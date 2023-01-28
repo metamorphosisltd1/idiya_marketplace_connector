@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="marketplace_config_details_view_form" model="ir.ui.view">
+        <field name="name">marketplace.config.details.view.form</field>
+        <field name="model">marketplace.config.details</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test_connection" string="Test Connection" type="object" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="api_provider"/>
+                            <field name="api_url"/>
+                        </group>
+                        <group id="themarket_api_details" attrs="{'invisible': [('api_provider', '!=', 'themarket')]}">
+                            <field name="themarket_username"/>
+                            <field name="themarket_password"/>                           
+                        </group>
+
+                        <group id="tradevine_api_details" attrs="{'invisible': [('api_provider', '!=', 'tradevine')]}">
+                            <field name="consumer_key"/>
+                            <field name="consumer_secret"/>
+                            <field name="access_token_key"/>
+                            <field name="access_token_secret"/>
+                            <field name="external_trade_me_organisation_name"/>
+                        </group>
+                        <group>
+                            <field name="team_id"/>
+                            <field name="pricelist_id"/>
+                            <field name="tz"/>
+                            <field name="active"/>
+                            <field name="location_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Products" name="product_template_ids">
+                            <field name="product_template_ids" readonly="1" nolabel="1" force_save="1">
+                                <tree editable="top">
+                                    <field name="product_template_id" force_save="1"/>
+                                    <field name="product_id" force_save="1"/>
+                                    <field name="config_id" invisible="1" force_save="1"/>
+                                    <field name="name" force_save="1"/>
+                                    <field name="ref_code" force_save="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Sale Order" name="sale_order_ids">
+                            <field name="sale_order_ids" readonly="1" nolabel="1" force_save="1">
+                                <tree editable="top">
+                                    <field name="config_id" invisible="1" force_save="1"/>
+                                    <field name="name" force_save="1"/>
+                                    <field name="ref_code" force_save="1"/>
+                                    <field name="sale_order_ref" force_save="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Sync Data" name="sync_data">
+                            <group>
+                                <field name="label" nolabel="1"/>
+                                <group>
+                                    <div class="o_row d-flex flex-column">
+                                        <div class="mb-4">
+                                            <button name="action_get_product" string="Import Products" type="object" class="btn-primary" invisible="1"/>
+                                        </div>
+                                        <div class="mb-4">
+                                            <button name="action_get_order" string="Import Orders" type="object" class="btn-primary" invisible="1"/>
+                                        </div>
+                                    </div>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="marketplace_config_details_view_tree" model="ir.ui.view">
+        <field name="name">marketplace.config.details.view.tree</field>
+        <field name="model">marketplace.config.details</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="api_provider" />
+                <field name="team_id"/>
+                <field name="tz"/>
+                <field name="active" invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_marketplace_config_details" model="ir.actions.act_window">
+        <field name="name">Marketplace</field>
+        <field name="res_model">marketplace.config.details</field>
+        <field name="view_mode">tree,form</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="menu_marketplace_configuration" action="action_marketplace_config_details" parent="website.menu_website_global_configuration"
+            sequence="45" name="Marketplace" groups="base.group_system"/>
+
+</odoo>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_marketplace_config_wizard_form" model="ir.ui.view">
+        <field name="name">marketplace.config.wizard.form</field>
+        <field name="model">marketplace.config.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="marketplace_config_ids" widget="many2many_tags"/>
+                </group>
+                <footer>
+                    <button string="Save" name="action_post_data" type="object" class="oe_highlight"/>
+                    <button string="Cancel" class="btn btn-default" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="view_order_form_inherit_marketplace" model="ir.ui.view">
+        <field name="name">sale.order.form.view.inherit.marketplace</field>
+        <field name="model">sale.order</field>
+        <field name="priority" eval="8" />
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Marketplace Config" name="marketplace_config_id">
+                    <group>
+                        <group>
+                            <field name="marketplace_config_id" readonly="1" force_save="1"/>
+                        </group>
+                    </group>
+                    <group string="Inventory Adjustment Note">
+                        <field name="inventory_adjustment_note" no_label="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="model_sale_order_action_post_order_data" model="ir.actions.server">
+        <field name="name">Create/Update Sale Order on Marketplace</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <!-- TODO: remove this server actio, bcoz we do not want to use -->
+        <!-- <field name="binding_model_id" ref="sale.model_sale_order"/> -->
+        <!-- <field name="binding_view_types">form,list</field> -->
+        <field name="state">code</field>
+        <field name="code">action = records.action_post_sale_order_data_on_marketpalce()</field>
+    </record>
+
+    <!-- Cron to synchronize sale order from tradevine -->
+    <record id="online_sync_sale_order_tradevine" model="ir.cron">
+      <field name="name">Sale: SaleOrder online sync marketplace</field>
+      <field name="model_id" ref="marketplace_connector.model_marketplace_config_details"/>
+      <field name="state">code</field>
+      <field name="code">model.cron_fetch_online_sale_order_from_marketplace()</field>
+      <field name="user_id" ref="base.user_root"/>
+      <field name="interval_number">30</field>
+      <field name="interval_type">minutes</field>
+      <field name="numbercall">-1</field>
+      <field name="doall" eval="False"/>
+    </record>
+
+</odoo>

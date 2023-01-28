@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="marketplace_product_category_view_form" model="ir.ui.view">
+        <field name="name">marketplace.prodproductcut.category.view.form</field>
+        <field name="model">marketplace.product.category</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="marketplace_config_id"/>
+                            <field name="parent_id"/>
+                        </group>
+                        <group>
+                            <field name="marketplace_catg_ref_number"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="marketplace_product_category_view_tree" model="ir.ui.view">
+        <field name="name">marketplace.product.category.view.tree</field>
+        <field name="model">marketplace.product.category</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="marketplace_config_id"/>
+                <field name="parent_id"/>
+                <field name="marketplace_catg_ref_number"/>
+                <field name="active" invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_marketplace_product_category" model="ir.actions.act_window">
+        <field name="name">Marketplace Category</field>
+        <field name="res_model">marketplace.product.category</field>
+        <field name="view_mode">tree,form</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="menu_marketplace_product_category" action="action_marketplace_product_category" parent="website.menu_website_global_configuration"
+            sequence="46" name="Marketplace Category" groups="base.group_system"/>
+
+</odoo>
