@@ -536,6 +536,7 @@ class Tradevine(models.AbstractModel):
             categ.pop('parent_number')
             records |= records.create(categ)
 
+
     def _load_tradevine_category_for_odoo(self, provider_config):
         resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,

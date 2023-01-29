@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 from copy import copy
 import logging
 
@@ -11,6 +8,7 @@ from odoo.addons.base.models.res_partner import _tz_get
 _logger = logging.getLogger(__name__)
 
 API_PROVIDER_END_POINT_URL = {
+    'kogan' : 'https://nimda-marketplace.aws.kgn.io/api/marketplace/v2/', #Kogan
     'tradevine' : 'https://api.tradevine.com',
     'themarket' : 'https://portal.themarket.com'
 }
@@ -23,11 +21,16 @@ class MarketPlaceConfigDetails(models.Model):
 
     def _get_api_provider(self):
         return [
+            ('kogan', 'Kogan'),
             ('tradevine', 'Tradevine'),
             ('themarket', 'TheMarket')
             ]
 
     name = fields.Char(string='Application Name', required=True, copy=False)
+    #Kogan
+    seller_token = fields.Char(required_if_api_provider='kogan', copy=False)
+    seller_id = fields.Char(required_if_api_provider='kogan', copy=False)
+    
     #Tradevine
     consumer_key = fields.Char(required_if_api_provider='tradevine', copy=False)
     consumer_secret = fields.Char(required_if_api_provider='tradevine', copy=False)
@@ -89,6 +92,11 @@ class MarketPlaceConfigDetails(models.Model):
             for config in records:
                 if config.api_provider == "tradevine":
                     api_provider_obj._load_tradevine_category_for_odoo(config)
+                    
+                elif config.api_provider == "kogan":
+                    api_provider_obj._load_kogan_category_for_odoo(config) #Kogan
+                    
+                    
                 elif config.api_provider == "themarket":
                     api_provider_obj._load_themarket_category_for_odoo(config)
                     api_provider_obj._load_themarket_brands_for_odoo(config)
@@ -104,10 +112,13 @@ class MarketPlaceConfigDetails(models.Model):
             if isinstance(response, dict) and not response.get('error_message'):
                 if self.api_provider == 'tradevine':
                     msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('TotalCount'), self.api_provider))
+                    
+                elif self.api_provider == 'kogan': #Kogan
+                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('CountTotal'), self.api_provider))
+                    
+                    
                 elif self.api_provider == 'themarket':
-                    # api_provider_obj._load_themarket_category_for_odoo(self)
                     api_provider_obj._load_themarket_brands_for_odoo(self)
-                    # api_provider_obj._load_themarket_colors_for_odoo(self)
                     msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 raise UserError(msg)
                 
@@ -121,7 +132,9 @@ class MarketPlaceConfigDetails(models.Model):
             if isinstance(response, dict) and not response.get('error_message'):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('TotalCount'), self.api_provider))
-                if self.api_provider == 'themarket':
+                elif self.api_provider == 'kogan':
+                    msg = _('Successfully Imported %s products from your %s account!' % (response.get('CountTotal'), self.api_provider))
+                elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 _logger.info('{}'.format(msg))
             else:
@@ -135,6 +148,8 @@ class MarketPlaceConfigDetails(models.Model):
             if isinstance(response, dict) and not response.get('error_message'):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('TotalCount'), self.api_provider))
+                elif self.api_provider == 'kogan':
+                    msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('CountTotal'), self.api_provider))
                 elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 _logger.info('{}'.format(msg))

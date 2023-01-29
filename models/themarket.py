@@ -160,6 +160,8 @@ class TheMarket(models.AbstractModel):
         if not product_id:
             return self._get_themarket_product_by_paged_list(provider_config, **kwargs)
 
+
+
     def _prepare_product_values(self, product_values):
         currency = self.env['res.currency']
         marketplace_brand = self.env['marketplace.product.brand']
@@ -345,6 +347,13 @@ class TheMarket(models.AbstractModel):
                 })
         return customer_value
 
+
+
+
+
+
+
+
     def _prepare_order_line_values(self, config, order_line_values):
         product_obj = self.env['product.product']
         marketplace_product_obj = self.env['marketplace.product.template']
@@ -417,6 +426,15 @@ class TheMarket(models.AbstractModel):
             'partner_invoice_id': invoice_address.id or customer.id,
             'partner_shipping_id': shipping_address.id or customer.id,
         }
+
+
+
+
+
+
+
+
+
 
     def _load_themarket_product_for_odoo(self, provider_config, pageNumber=1, pageSize=50):
         response = self._get_themarket_product_by_paged_list(
@@ -492,6 +510,9 @@ class TheMarket(models.AbstractModel):
             else:
                 break
         return response
+
+
+
 
     def _load_themarket_order_for_odoo(self, provider_config, pageNumber=1, pageSize=499, createdFrom=None, createdTo=None):
         response = self._get_themarket_order_by_paged_list(
@@ -678,11 +699,6 @@ class TheMarket(models.AbstractModel):
 
     def _post_themarket_product_image(self, provider_config,image_name, image):
         _logger.info('TheMaket Uploading photo')
-        
-            # image = {
-            #     "FileName": product.default_code or product.x_studio_sku +".jpeg",
-            #     "ContentsBase64": product.image_1920.decode('utf-8'),
-            # }
         files = [(
             'file',(
                 image_name  ,

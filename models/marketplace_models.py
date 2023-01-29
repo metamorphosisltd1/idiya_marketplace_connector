@@ -153,28 +153,19 @@ class MarketplaceStockWarehouse(models.Model):
     warehouse_id = fields.Many2one('stock.warehouse', ondelete='cascade')
 
 
+
+
+
 class TradeMeListingRule(models.Model):
     _name = 'trade.me.listing.rule'
     _description = 'Trademe Linsting Rule'
 
 
     LISTING_RULE = [(str(k), v) for k, v in tradevine_lookup.get_trade_me_listing_rule_priority().items()]
-
-    # def _get_default_config_id(self):
-    #     return self.env['marketplace.config.details'].search([()],limit=1).id
-
-    # def _get_default_max_qty (self):
-    #     qty = 0 
-    #     for loc in self.config_id.location_ids:
-    #         qty += sum(self.product_template_id.with_context({"location" : loc.id}).mapped("virtual_available"))
-    #     return qty
-
    
     name = fields.Char(required=True, index=True, default='Rule_MM')
     config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', domain=[('api_provider', '=', 'tradevine')], required=True, ondelete='cascade')
     ref_code = fields.Char()
-    # config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', domain=[('api_provider', '=', 'tradevine')], required=True, ondelete='cascade')
-    # config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', default='_get_default_config_id', required=True, ondelete='cascade')
     product_template_id = fields.Many2one('product.template', ondelete='cascade')
     product_id = fields.Many2one('product.product', ondelete='cascade')
     marketplace_product = fields.Many2one('marketplace.product.template', compute='_compute_marketplace_product', domain=[('config_id.api_provider', '=', 'tradevine')], readonly=True, store=True)
@@ -193,13 +184,7 @@ class TradeMeListingRule(models.Model):
     brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id', readonly=False)
     is_listing_new = fields.Boolean(string='Brand new', default=True,
         help="Uncheck this box if this product is Used condition.")
-    
-    # @api.onchange('config_id')
-    # def _compute_max_qty(self):
-    #     qty = 0 
-    #     for loc in self.config_id.location_ids:
-    #         qty += sum(self.product_template_id.product_variant_id.with_context({"location" : loc.id}).mapped("free_qty"))
-    #     self.buy_now_max_qty = qty
+
 
     def _compute_subtitle(self):
         if not self.subtitle:
@@ -242,6 +227,10 @@ class TradeMeListingRule(models.Model):
         return super(TradeMeListingRule, self).unlink()
 
 
+
+
+
+
 class TheMarketColorMapping(models.Model):
     _name='themarket.color.mapping'
     _description = 'Color Mapping for The Market'
@@ -251,15 +240,10 @@ class TheMarketColorMapping(models.Model):
     themarket_ref = fields.Integer("The Market Color ID", required=True)
     themarket_color_code = fields.Char("Color Code", required=True)
     
+    
 class TheMarketListingRule(models.Model):
     _name = 'themarket.listing.rule'
     _description = 'TheMarket Linsting Rule'
-
-    # LISTING_RULE = [(str(k), v) for k, v in tradevine_lookup.get_trade_me_listing_rule_priority().items()]
-
-    # def _get_default_config_id(self):
-    #     return self.env['marketplace.config.details'].search([()],limit=1).id
-
    
     name = fields.Char(required=True, index=True, default='Rule_MM')
     config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', domain=[('api_provider', '=', 'themarket')], required=True, ondelete='cascade')

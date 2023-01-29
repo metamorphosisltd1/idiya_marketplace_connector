@@ -219,6 +219,15 @@ class TradevineExtraImageUpload(http.Controller):
                 rule.ref_code = resp.get('TradeMeListingRuleID')
             time.sleep(1)
 
+
+
+
+
+
+
+
+
+
     @http.route("/marketplace/themarket/colormapping", type='http', auth='public', csrf=False)
     def _themarket_color_mapping(self, **post):
         data = {}
