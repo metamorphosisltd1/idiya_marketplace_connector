@@ -577,3 +577,213 @@ class TradevineExtraImageUpload(http.Controller):
             _logger.error("Invalid image link {}".format(
                 image))
             return False
+        
+        
+        
+        
+        
+        
+class KoganExtraImageUpload(http.Controller):
+    #------------------------------------------------------------------------#
+    # This code uploads and reassigns product template extra medias to
+    # Kogan products
+    #------------------------------------------------------------------------#
+    @http.route('/marketplace/kogan/sync-all-products', type='http', auth='user', csrf=False)
+    def kogan_sync_all_product(self, limit=15, offset=0,):
+        marketplace_config_ids = request.env['marketplace.config.details'].search([])
+        for config in marketplace_config_ids:
+            domain = [
+                "&",
+                "&",
+                [
+                    "type",
+                    "in",
+                    [
+                        "product"
+                    ]
+                ],
+                [
+                    "is_published",
+                    "=",
+                    True
+                ],
+                
+                [
+                    "kogan_listing_rule_ids",
+                    "!=",
+                    False
+                ],
+            ]
+            all_product = request.env['product.template'].search(domain)
+
+            len_all_prod = len(all_product)
+
+            _logger.warning(
+                "kogan_sync_all_product  total product found {} ".format(len_all_prod))
+            
+            offset = int(offset)
+            limit = int(limit)
+            wiz = request.env['marketplace.config.wizard'].create({
+                'marketplace_config_ids':[(4,config.id)]
+            })
+            
+            while (offset < len_all_prod):
+                start_time = time.time()
+                _logger.warning(
+                            "kogan_sync_all_product limit {}, offset {}".format(limit,offset))
+                products = request.env['product.template'].search(domain, limit=limit, offset=offset)
+                
+                
+                wiz.with_context({
+                    'active_model': 'product.template',
+                    'active_ids': products.ids,
+                    'method': 'product'
+                }).action_post_data()
+                t_time = time.time() - start_time
+                if t_time < 60:
+                    time.sleep(60 - t_time)                        
+                offset += limit
+        
+       
+        return "success"
+    
+    
+    
+    
+    @http.route('/marketplace/kogan/outofstockproducts', type='http', auth='public', csrf=False)
+    def _get_kogan_outofstock_products(self):
+        outofstocks = []
+        tv_products = request.env['product.template'].search([("type","=", "product")]).filtered(lambda p: p.marketplace_config_ids)
+        for tv_prod in tv_products:
+            for conf in tv_prod.marketplace_config_ids.filtered(lambda conf: conf.config_id.api_provider == 'kogan'):
+                var_stocks = []
+                for loc in conf.config_id.location_ids:
+                    for variant in tv_prod.product_variant_ids:
+                        var_stocks.append(sum(variant.with_context({"location" : loc.id}).mapped("free_qty")))
+                if len(var_stocks)>0 and min(var_stocks) == 0:
+                    outofstocks.append(tv_prod.default_code or (tv_prod.x_studio_sku or tv_prod.display_name))
+                    
+        outofstocks = list(set(outofstocks))
+        _logger.warning("Total Out of stock for kogan is {}".format(len(outofstocks)))
+        return "<br/>".join(outofstocks)
+
+
+
+
+    @http.route('/marketplace/kogan/productimage/upload', type='http', auth='public', csrf=False)
+    def _post_kogan_product_extra_images(self, **post):
+        _logger.warning('Beginning _post_kogan_product_extra_images')
+        products = request.env['product.template'].sudo().search([])
+
+        for product in products.filtered(lambda p: p.categ_id.name not in ['Clothing'] or p.categ_id.parent_id.name not in ['Clothing']):
+            try:
+                _logger.warning(
+                    'Beginning _post_kogan_product_extra_images of product Id : %i' % (product.id))
+                if product.product_template_image_ids:
+                    _count = 1
+                    for img in product.product_template_image_ids:
+
+                        image = {
+                            "FileName": product.default_code or product.x_studio_sku + "-"+str(_count)+".jpeg",
+                            "ContentsBase64": img.image_1920.decode('utf-8'),
+                        }
+                        _count += 1
+                        listing_rules = product.kogan_listing_rule_ids
+                        for listing_rule in listing_rules.filtered(lambda c: c.config_id.api_provider == "kogan"):
+                            provider_config = listing_rule.config_id
+                            _logger.warning(
+                                'provider_config Name : %s' % (provider_config.name))
+
+                            resp = request.env['marketplace.connector']._synch_with_marketplace_api(
+                                api_provider_config=provider_config,
+                                http_method='POST',
+                                service_endpoint='v1/Photo',
+                                params={},
+                                data=json.dumps(image),
+                            )
+                            if isinstance(resp, dict) and not resp.get('error_message'):
+                                _logger.warning(
+                                    'PhotoID {}'.format(resp.get('PhotoID'))
+                                )
+                            time.sleep(1)
+
+            except:
+                continue
+
+        return "success"
+    
+    @http.route('/marketplace/kogan/pull/sales', type='http', auth='public', csrf=False)
+    def _cron_fetch_online_sale_order_kogan(self, **post):
+        _count = 0
+        config = request.env['marketplace.config.details'].sudo().search([("id", "=",post.get('config_id'))], limit=1)
+        request.env['kogan'].cron_fetch_online_sale_order_kogan(config)
+        return "success"
+    
+    @http.route('/marketplace/kogan/stock/update', type='http', auth='public', csrf=False)
+    def _post_kogan_product_stock_update(self, **post):
+        _count = 0
+
+        product_variants = request.env['product.product'].sudo().search([])
+        for variant in product_variants.filtered(lambda v: len(v.product_tmpl_id.kogan_listing_rule_ids)>0 and len(v.marketplace_config_ids)>0):
+            variant._call_to_update_marketplace_product_stock()
+            _count += 1
+            time.sleep(1.5)
+        return "total attempted products {}".format(_count)
+
+    @http.route('/marketplace/kogan/rule/update', type='http', auth='public', csrf=False)
+    def _post_kogan_product_stock_update(self, **post):
+        _count = 0
+        config = request.env['marketplace.config.details'].sudo().search([("id", "=",post.get('config_id'))], limit=1)
+        # api_provider_name = config.api_provider
+        # api_provider_obj = request.env['%s' % api_provider_name]
+        products = request.env['product.template'].sudo().search([])
+        for product in products.filtered(lambda p: len(p.kogan_listing_rule_ids)>0 ):
+            _logger.warning("product :-> {}".format(product.display_name))
+            for rule in product.kogan_listing_rule_ids:
+                rule.write({'buy_now_max_qty' : 0.0})
+                _logger.warning("rule id {}, max_qty {}".format(rule.id, rule.buy_now_max_qty))
+
+            for variant in product.product_variant_ids:
+                variant._call_to_update_marketplace_product_stock()
+            self._post_kogan_listing_rule(config, product)
+            _count += 1
+            time.sleep(2)
+        _logger.warning("total attempted products {}".format(_count))
+        return "total attempted products {}".format(_count)
+
+    def _post_kogan_listing_rule(self, provider_config,  product, resp={}, config_app=False, params=None):
+        for rule in product.kogan_listing_rule_ids.filtered(lambda r: r.ref_code and r.marketplace_product.ref_code):
+            data = {
+                'KoganListingRuleID': rule.ref_code ,
+                'ProductID': rule.marketplace_product.ref_code,
+                'ProdcutCode': rule.marketplace_product.product_id.default_code or None,
+                'RuleName': rule.name,
+                'Title': rule.title,
+                'SubTitle': rule.subtitle,
+                'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
+                'CategoryNumber': rule.category_number.marketplace_catg_ref_number,
+                # 'Description':str(rule.description)[:2047] or '',
+                'IsAutoListingEnabled': rule.is_auto_listing_enabled,
+                'AutoListingPriority': int(rule.auto_listing_priority),
+                'IsUseBuyNow': rule.is_use_buy_now_enabled,
+                'Photos': product.marketplace_photo_id or None,
+                'PhotoIdentifier': product.photo_identifier or None,
+                'BuyNowPrice': rule.buy_now_price,
+                "IsSellMultipleQty": bool(rule.buy_now_max_qty),
+                "SellMultipleQuantity": rule.buy_now_max_qty,
+                'StartPrice': rule.buy_now_price if rule.is_use_buy_now_enabled else rule.start_price,
+                'IsListingNew': rule.is_listing_new,
+
+            }
+            _logger.warning('_post_kogan_listing_rule data {}'.format(data))
+            resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+                api_provider_config=provider_config,
+                http_method='POST',
+                service_endpoint='v1/KoganListingRule/%s' % rule.ref_code,
+                params=params or {},
+                data=json.dumps(data),
+            )
+
+            if isinstance(resp, dict) and not resp.get('error_message'):
+                rule.ref_code = resp.get('KoganListingRuleID')
+            time.sleep(1)

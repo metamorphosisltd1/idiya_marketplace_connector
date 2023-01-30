@@ -635,3 +635,27 @@ def get_order_origin(lookup_value=None):
         return order_origin[lookup_value]
     return order_origin
 
+
+
+def get_inventory_entry_type(lookup_value=None):
+    inventory_entry_type = {
+        36000: 'Purchase Order Adjustment (+)',
+        36001: 'Sales Order Adjustment (-)',
+        36002: 'Updated Quantity in Stock',
+        36003: 'Import Opening Quantity in Stock',
+        36004: 'Opening Quantity in Stock',
+        36005: 'EOY Reconciliation',
+        36007: 'Obsolete Stock (-)',
+        36008: 'Breakage (-)',
+        36009: 'Stocktake',
+        36012: 'Sales Credit Adjustment (+)',
+        36013: 'Purchase Credit Adjustment (-)',
+        36014: 'Increase Stock (+)',
+        36015: 'Reduce Stock (-)',
+        36016: 'Transfer Stock Out (-)',
+        36017: 'Transfer Stock In (+)',
+        36018: 'Stocktake - Cost Replacement',
+    }
+    if lookup_value:
+        return inventory_entry_type[lookup_value]
+    return inventory_entry_type

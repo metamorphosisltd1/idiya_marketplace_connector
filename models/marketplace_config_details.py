@@ -95,7 +95,7 @@ class MarketPlaceConfigDetails(models.Model):
                     
                 elif config.api_provider == "kogan":
                     api_provider_obj._load_kogan_category_for_odoo(config) #Kogan
-                    
+                    api_provider_obj._load_kogan_brand_for_odoo
                     
                 elif config.api_provider == "themarket":
                     api_provider_obj._load_themarket_category_for_odoo(config)

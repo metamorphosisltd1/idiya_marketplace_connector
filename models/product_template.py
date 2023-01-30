@@ -11,6 +11,7 @@ _logger = logging.getLogger(__name__)
 # fields and method to use api call
 MARKETPLACE_HOOK_FIELDS = {
     'trade_me_listing_rule_ids': '_trade_me_listing_rule',
+    'kogan_listing_rule_ids' : '',
 }
 
 class ProductTemplate(models.Model):
@@ -29,6 +30,7 @@ class ProductTemplate(models.Model):
     marketplace_inventory_adjustment_ids = fields.One2many('marketplace.inventory.adjustment.history', 'product_template_id', string="Inventory Adjustment History", copy=False)
     trade_me_listing_rule_ids = fields.One2many('trade.me.listing.rule', 'product_template_id', string='TradeMe Listing Rule')
     themarket_listing_rule_ids = fields.One2many('themarket.listing.rule', 'product_template_id', string='TheMarket Listing Rule')
+    kogan_listing_rule_ids = fields.One2many('', 'product_template_id', string='Kogan Listing Rule')
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -32,6 +32,10 @@ class Tradevine(models.AbstractModel):
     _name = 'tradevine'
     _description = 'Tradevine API'
 
+
+
+
+
     def _get_tradevine_oauth_signature(self, consumer_secret, token_secret):
         token_secret = '%26' + token_secret
         return consumer_secret + token_secret
@@ -56,6 +60,11 @@ class Tradevine(models.AbstractModel):
         }
         return headers
 
+
+
+
+
+# Get Product >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _get_tradevine_product_by_id(self, provider_config, product_id, **kwargs):
         '''This method gets an individual product specified by the supplied ID - 
             the output consists of top level product information, including summary inventory quantities
@@ -104,6 +113,10 @@ class Tradevine(models.AbstractModel):
         if not product_id:
             return self._get_tradevine_product_by_paged_list(provider_config, **kwargs)
 
+
+
+
+#Product Value>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_product_values(self, product_values, config):
         currency = self.env['res.currency']
         marketplace_brand = self.env['marketplace.product.brand']
@@ -137,9 +150,13 @@ class Tradevine(models.AbstractModel):
             'is_manual_order_approval_needed': product_values.get('IsManualOrderApprovalNeeded'),
             'active': not product_values.get('IsArchived'),
             'marketplace_enable_inventory': product_values.get('EnableInventory'),
-            # 'category_ref_id': product_values.get('ProductCategoryID'),
         }
 
+
+
+
+
+# Get Customer Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_customer_values(self, customer_values, billing_address, shipping_address):
         marketplace_partner_obj = self.env['marketplace.res.partner']
         config = self.env.context.get('config')
@@ -218,6 +235,9 @@ class Tradevine(models.AbstractModel):
                 i += 1
         return tuple(customers)
 
+
+
+# New Customer Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _create_new_tradevine_customer_values(self, values, parent=False):
         if not self.env.context.get('need_to_create_address'):
             return {}
@@ -301,6 +321,9 @@ class Tradevine(models.AbstractModel):
                 })
         return customer_value
 
+
+
+# Prepare Order Line >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_order_line_values(self, config, order_line_values):
         product_obj = self.env['product.product']
         marketplace_product_obj = self.env['marketplace.product.template']
@@ -336,6 +359,8 @@ class Tradevine(models.AbstractModel):
             }))
         return vals
 
+
+# Prepare Order Values >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_order_values(self, config, order_values):
         self = self.with_context(config=config)
         BillingAddress = order_values['BillingAddress']
@@ -361,6 +386,8 @@ class Tradevine(models.AbstractModel):
                 [('code', '=', order_values['WarehouseCode'])], limit=1)
             if not warehouse:
                 warehouse = warehouse.search([], limit=1)
+                
+                
         marketplace_list_id = self.env['marketplace.list'].search([('marketplace_id', '=', config.id)], limit=1)
         woo_backend = self.env['wordpress.configure'].sudo().search([],limit=1)
         payment_status = 'pending'
@@ -390,10 +417,16 @@ class Tradevine(models.AbstractModel):
             'acqurer_name': acqurer_name,
         }
 
+
+
+
+
+# Product for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _load_tradevine_product_for_odoo(self, provider_config, pageNumber=1, pageSize=499):
         response = self._get_tradevine_product_by_paged_list(
             provider_config, pageNumber, pageSize) or {}
         total_product = response.get('TotalCount')
+        
         load_product = 0
         product_obj = self.env['product.product']
         marketplace_product_obj = self.env['marketplace.product.template']
@@ -450,6 +483,10 @@ class Tradevine(models.AbstractModel):
                 break
         return response
 
+
+
+
+#Order for odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _load_tradevine_order_for_odoo(self, provider_config, pageNumber=1, pageSize=499, createdFrom=None, createdTo=None):
         response = self._get_tradevine_order_by_paged_list(
             provider_config, pageNumber, pageSize, createdFrom=createdFrom, createdTo=createdTo) or {}
@@ -499,6 +536,11 @@ class Tradevine(models.AbstractModel):
                 break
         return response
 
+
+
+
+
+# Category for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _import_category_from_tradevine(self, config, datas, level=0):
         categories = [{
             'name': datas['Name'],
@@ -550,6 +592,13 @@ class Tradevine(models.AbstractModel):
             self._import_category_from_tradevine(provider_config, resp)
         return resp
 
+
+
+
+
+
+
+# Product Photo Post Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_product_photo_post_data(self, provider_config, product, photoID=None):
         _logger.warning('taradevine product {}, {}, PhotoID {}'.format(product._name, product.id, photoID))
         photos = []
@@ -575,10 +624,14 @@ class Tradevine(models.AbstractModel):
 
         return photos
 
+
+
+
+# Product Post data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_product_post_data(self, provider_config, product, create_on_tradevine=False):
-        _logger.warning('taradevine Product model %s, %i' %
+        _logger.warning('tradevine Product model %s, %i' %
                      (product._name, product.id))
-        _logger.warning('taradevine provider_config %s, %i' %
+        _logger.warning('tradevine provider_config %s, %i' %
                      (provider_config._name, provider_config.id))
         currency = self.env['res.currency']
         marketplace_brand = self.env['marketplace.product.brand']
@@ -592,7 +645,6 @@ class Tradevine(models.AbstractModel):
             product) if provider_config.pricelist_id else None
         taxes_id = product.taxes_id
         if not taxes_id:
-            #taxes_id = self.env.ref('l10n_generic_coa.sale_tax_template')
             taxes_id = self.env['account.tax'].sudo().search([['id','=',2]])
             product.taxes_id = [(4,taxes_id.id)]
         res = taxes_id.compute_all(product_new_price or product.list_price)
@@ -649,6 +701,10 @@ class Tradevine(models.AbstractModel):
 
         return values
 
+
+
+
+# Stock Quantity >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def get_stock_qtys(self, product, provider_config):
         qty = 0
         if provider_config.location_ids:
@@ -659,6 +715,10 @@ class Tradevine(models.AbstractModel):
 
         return qty
 
+
+
+
+# Product Update Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_product_update_vals(self, provider_config, config_app, product, resp):
         if config_app:
             value = {
@@ -682,9 +742,17 @@ class Tradevine(models.AbstractModel):
                 'category_ref_id': resp.get('ProductCategoryID'),
             })
 
+
+
+
+
+
+
+# trade me listing rule >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _post_trade_me_listing_rule(self, provider_config,  product, resp={}, config_app=False, params=None):
         if product._name == 'marketplace.product.template':
             product = product.product_template_id
+
 
         for rule in product.trade_me_listing_rule_ids.filtered(lambda r: r.config_id.id == provider_config.id):
             
@@ -1008,15 +1076,18 @@ class Tradevine(models.AbstractModel):
         current_date = fields.Datetime.from_string(
             fields.Date.context_today(self))
         tradevine_tz = pytz.timezone(config_app.tz or 'UTC')
+        
         start_with_zero_hours = current_date.astimezone(
             tradevine_tz).replace(tzinfo=None)
+        
         createdFrom = current_date.replace(
             hour=0, minute=0, second=0, microsecond=0)- timedelta(days=7)
-        # createdTo = pytz.utc.localize(current_date).astimezone(
-        #     tradevine_tz).replace(tzinfo=None)
+
         createdTo = current_date.astimezone(
             tradevine_tz).replace(tzinfo=None)
+        
         createdFrom = '{:%Y-%m-%dT%H:%M:%S.%fz}'.format(createdFrom)
         createdTo = '{:%Y-%m-%dT%H:%M:%S.%fz}'.format(createdTo)
+        
         return self._load_tradevine_order_for_odoo(
             config_app, pageNumber=1, pageSize=499, createdFrom=createdFrom, createdTo=createdTo)
