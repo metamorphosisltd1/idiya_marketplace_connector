@@ -19,6 +19,9 @@ class ProductTemplate(models.Model):
 
     marketplace_config_ids = fields.One2many('marketplace.product.template', 'product_template_id', string="Marketplace Application", copy=False)
     marketplace_brand_id = fields.Many2one('marketplace.product.brand', string='Trademe Brand', domain=[('config_id.api_provider', '=', 'tradevine')])
+    
+    kogan_brand_id = fields.Many2one('marketplace.product.brand', string='Kogan Brand', domain=[('config_id.api_provider', '=', 'kogan')])
+
     themarket_brand_id = fields.Many2one('marketplace.product.brand', string='TheMarket Brand',  domain=[('config_id.api_provider', '=', 'themarket')])
     themarket_category_id = fields.Many2one('marketplace.product.category', string='TheMarket Category',  domain=[('marketplace_config_id.api_provider', '=', 'themarket')])
     is_manual_order_approval_needed = fields.Boolean(copy=False, help='''
@@ -88,35 +91,6 @@ class ProductProduct(models.Model):
             },
             'name': _('Create/Update Product for Marketplace Account'),
         }
-
-    # ####___OVERRIDE_______#########
-    # @api.depends('stock_move_ids.product_qty', 'stock_move_ids.state')
-    # @api.depends_context(
-    #     'lot_id', 'owner_id', 'package_id', 'from_date', 'to_date',
-    #     'location', 'warehouse',
-    # )
-    # def _compute_quantities(self):
-    #     products = self.filtered(lambda p: p.type != 'service')
-    #     res = products._compute_quantities_dict(self._context.get('lot_id'), self._context.get('owner_id'), self._context.get('package_id'), self._context.get('from_date'), self._context.get('to_date'))
-    #     for product in products:
-    #         product.qty_available = res[product.id]['qty_available']
-    #         product.incoming_qty = res[product.id]['incoming_qty']
-    #         product.outgoing_qty = res[product.id]['outgoing_qty']
-    #         product.virtual_available = res[product.id]['virtual_available']
-    #         product.free_qty = res[product.id]['free_qty']
-    #         product.stock_free_qty = res[product.id]['free_qty']
-    #         if product.default_code == 'TEST1243':
-    #             _logger.warning('_call_to_compute_quantities for product variant id {} stock_free_qty {}'.format(product.id, product.stock_free_qty))
-
-            
-    #     # Services need to be set with 0.0 for all quantities
-    #     services = self - products
-    #     services.qty_available = 0.0
-    #     services.incoming_qty = 0.0
-    #     services.outgoing_qty = 0.0
-    #     services.virtual_available = 0.0
-    #     services.free_qty = 0.0
-    #     services.stock_free_qty = 0.0
      
 
     @api.depends("virtual_available")

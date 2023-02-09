@@ -659,3 +659,15 @@ def get_inventory_entry_type(lookup_value=None):
     if lookup_value:
         return inventory_entry_type[lookup_value]
     return inventory_entry_type
+
+
+
+def get_kogan_listing_rule_priority(lookup_value=None):
+    kogan_listing_rule_priority = {
+        73001: 'High',
+        73002: 'Medium',
+        73003: 'Low',
+    }
+    if lookup_value:
+        return kogan_listing_rule_priority[lookup_value]
+    return kogan_listing_rule_priority

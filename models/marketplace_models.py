@@ -7,6 +7,7 @@ from multiprocessing import Condition
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 from ...marketplace_connector.models import tradevine_lookup
+from ...marketplace_connector.models import kogan_lookup
 
 import logging
 _logger = logging.getLogger(__name__)
@@ -156,6 +157,12 @@ class MarketplaceStockWarehouse(models.Model):
 
 
 
+
+
+
+
+
+# TradeVine >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 class TradeMeListingRule(models.Model):
     _name = 'trade.me.listing.rule'
     _description = 'Trademe Linsting Rule'
@@ -183,7 +190,7 @@ class TradeMeListingRule(models.Model):
     description = fields.Text(related='product_template_id.description_sale', string="Description")
     brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id', readonly=False)
     is_listing_new = fields.Boolean(string='Brand new', default=True,
-        help="Uncheck this box if this product is Used condition.")
+    help="Uncheck this box if this product is Used condition.")
 
 
     def _compute_subtitle(self):
@@ -231,6 +238,91 @@ class TradeMeListingRule(models.Model):
 
 
 
+
+
+
+
+
+#Kogan >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+class KoganListingRule(models.Model):
+    _name = 'kogan.listing.rule'
+    _description = 'Kogan Linsting Rule'
+
+
+    LISTING_RULE = [(str(k), v) for k, v in kogan_lookup.get_kogan_listing_rule_priority().items()]
+
+    name = fields.Char(required=True, index=True, default='Rule_MM')
+    config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', domain=[('api_provider', '=', 'kogan')], required=True, ondelete='cascade')
+    ref_code = fields.Char()
+    product_template_id = fields.Many2one('product.template', ondelete='cascade')
+    product_id = fields.Many2one('product.product', ondelete='cascade')
+    marketplace_product = fields.Many2one('marketplace.product.template', compute='_compute_marketplace_product', domain=[('config_id.api_provider', '=', 'kogan')], readonly=True, store=True)
+    is_auto_listing_enabled = fields.Boolean(string='Auto-listing',default=True)
+    is_use_buy_now_enabled = fields.Boolean(string='Buy Now Only', default=True)
+    buy_now_max_qty = fields.Float(string='Maximum Quantity', readonly=False, store=True)
+    auto_listing_priority = fields.Selection(LISTING_RULE, required=True, default="73002")
+    title = fields.Char(required=True, related='product_template_id.name', readonly=False)
+    subtitle = fields.Char(string= "Subtitle", compute='_compute_subtitle', copy=False, readonly=False)
+    start_price = fields.Float('Start Price', related='product_template_id.list_price', readonly=False)
+    buy_now_price = fields.Float('Buy Now Price',related='product_template_id.list_price', readonly=False)
+    # Issue : external_trade_me_organisation_name  marketplace_config_details.py ( Line 39 )
+    external_kogan_organisation_name = fields.Char(related='config_id.external_trade_me_organisation_name')
+    
+    productID = fields.Char()
+    category_number = fields.Many2one('marketplace.product.category', required=True)
+    description = fields.Text(related='product_template_id.description_sale', string="Description")
+    brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id', readonly=False)
+    is_listing_new = fields.Boolean(string='Brand new', default=True,
+    help="Uncheck this box if this product is Used condition.")
+
+
+    def _compute_subtitle(self):
+        if not self.subtitle:
+            if self.product_template_id.kogan_brand_id:
+                self.subtitle = "Original " + self.product_template_id.kogan_brand_id.name + " Brand Product"
+            else:
+                self.subtitle = "Original Brand Product"
+
+
+    @api.constrains('start_price', 'buy_now_price')
+    def _check_listing_price(self):
+        for rule in self:
+            if not rule.is_use_buy_now_enabled and rule.start_price > rule.buy_now_price:
+                raise ValidationError(_("Error! For Listing Rule, The Buy Now price cannot be less than the Start price."))
+            if not rule.is_use_buy_now_enabled and rule.start_price == 0:
+                raise ValidationError(_("Error! StartPrice must be greater than zero."))
+        return True
+
+    @api.depends('product_id.marketplace_config_ids.ref_code', 'product_template_id.marketplace_config_ids.ref_code')
+    def _compute_marketplace_product(self):
+        for rule in self:
+            if rule.product_id:
+                product_id = rule.product_id.marketplace_config_ids.filtered(lambda rec: rec.product_id == rule.product_id)
+                if len(product_id) > 0:
+                    rule.marketplace_product = product_id[0]
+                    break
+            if rule.product_template_id:
+                product_template_id = rule.product_template_id.marketplace_config_ids.filtered(lambda rec: rec.product_id == rule.product_template_id)
+                if len(product_template_id) > 0:
+                    rule.marketplace_product = product_template_id[0]
+                    break
+            rule.marketplace_product = False
+
+    def unlink(self):
+        for rule in self.exists():
+            if rule.ref_code:
+                api_provider = rule.config_id.api_provider
+                api_provider_obj = self.env['%s' % api_provider]
+                api_provider_obj._delete_tradevine_listing_rule(rule)
+        return super(TradeMeListingRule, self).unlink()
+
+
+
+
+
+
+
+# The Market >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 class TheMarketColorMapping(models.Model):
     _name='themarket.color.mapping'
     _description = 'Color Mapping for The Market'
