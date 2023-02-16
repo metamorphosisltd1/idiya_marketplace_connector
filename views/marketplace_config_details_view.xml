@@ -21,6 +21,12 @@
                             <field name="themarket_password"/>                           
                         </group>
 
+                        <!-- Issue >>> Auth Field from marketplace_config_details.py >>>>>>>>>>>>>>>>>>>>-->
+                        <group id="kogan_api_details" attrs="{'invisible': [('api_provider', '!=', 'kogan')]}">
+                            <field name="seller_token"/>
+                            <field name="seller_id"/>                           
+                        </group>
+                        
                         <group id="tradevine_api_details" attrs="{'invisible': [('api_provider', '!=', 'tradevine')]}">
                             <field name="consumer_key"/>
                             <field name="consumer_secret"/>
@@ -28,6 +34,7 @@
                             <field name="access_token_secret"/>
                             <field name="external_trade_me_organisation_name"/>
                         </group>
+                        
                         <group>
                             <field name="team_id"/>
                             <field name="pricelist_id"/>

@@ -19,7 +19,7 @@ class MarketPlace(models.Model):
 
     name = fields.Char(required=True)
     config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', required=True, ondelete='cascade')
-    ref_code = fields.Char('Ref. Code', required=True)
+    ref_code = fields.Char('Ref.Code', required=True)
 
 
 class MarketPlacePartner(models.Model):
@@ -250,10 +250,9 @@ class KoganListingRule(models.Model):
 
 
     LISTING_RULE = [(str(k), v) for k, v in kogan_lookup.get_kogan_listing_rule_priority().items()]
-
-    name = fields.Char(required=True, index=True, default='Rule_MM')
+    name = fields.Char(required=True, index=True, default='Rule_MM_Kogan')
     config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', domain=[('api_provider', '=', 'kogan')], required=True, ondelete='cascade')
-    ref_code = fields.Char()
+    ref_code = fields.Char("Kogan Style Id", copy=False)
     product_template_id = fields.Many2one('product.template', ondelete='cascade')
     product_id = fields.Many2one('product.product', ondelete='cascade')
     marketplace_product = fields.Many2one('marketplace.product.template', compute='_compute_marketplace_product', domain=[('config_id.api_provider', '=', 'kogan')], readonly=True, store=True)
@@ -266,14 +265,13 @@ class KoganListingRule(models.Model):
     start_price = fields.Float('Start Price', related='product_template_id.list_price', readonly=False)
     buy_now_price = fields.Float('Buy Now Price',related='product_template_id.list_price', readonly=False)
     # Issue : external_trade_me_organisation_name  marketplace_config_details.py ( Line 39 )
-    external_kogan_organisation_name = fields.Char(related='config_id.external_trade_me_organisation_name')
-    
+    # external_kogan_organisation_name = fields.Char(related='config_id.external_trade_me_organisation_name')
+
     productID = fields.Char()
-    category_number = fields.Many2one('marketplace.product.category', required=True)
     description = fields.Text(related='product_template_id.description_sale', string="Description")
-    brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id', readonly=False)
-    is_listing_new = fields.Boolean(string='Brand new', default=True,
-    help="Uncheck this box if this product is Used condition.")
+    brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id',domain=[('config_id.api_provider', '=', 'kogan')], readonly=False)
+    category_number = fields.Many2one('marketplace.product.category', related='product_template_id.kogan_category_id', string='Kogan Category', required=True)
+    is_listing_new = fields.Boolean(string='Brand new', default=True, help="Uncheck this box if this product is Used condition.")
 
 
     def _compute_subtitle(self):
@@ -313,8 +311,8 @@ class KoganListingRule(models.Model):
             if rule.ref_code:
                 api_provider = rule.config_id.api_provider
                 api_provider_obj = self.env['%s' % api_provider]
-                api_provider_obj._delete_tradevine_listing_rule(rule)
-        return super(TradeMeListingRule, self).unlink()
+                api_provider_obj._delete_kogan_listing_rule(rule)
+        return super(KoganListingRule, self).unlink()
 
 
 

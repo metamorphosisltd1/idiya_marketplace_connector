@@ -90,6 +90,7 @@ class TheMarket(models.AbstractModel):
         }
         return headers
 
+
     def _get_themarket_product_by_id(self, provider_config, style_code, **kwargs):
         '''This method gets an individual product specified by the supplied ID - 
             the output consists of top level product information, including summary inventory quantities

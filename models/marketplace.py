@@ -55,7 +55,7 @@ class MarketPlaceConnector(models.AbstractModel):
                 files=files,
                 timeout=TIMEOUT)
             _logger.warning('request url : {}'.format(resp.url))
-            # _logger.warning('response from marketplace post/get (HTTP status {})'.format(resp.content))
+            _logger.warning('response from marketplace post/get (HTTP status {})'.format(resp.content))
             resp.raise_for_status()
             if resp.text != 'null' and bool(resp.text):
                 if isinstance(resp.content, str):

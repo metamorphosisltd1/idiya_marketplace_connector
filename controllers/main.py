@@ -47,6 +47,7 @@ class TradevineExtraImageUpload(http.Controller):
                     False
                 ],
             ]
+            
             all_product = request.env['product.template'].search(domain)
 
             len_all_prod = len(all_product)
@@ -181,6 +182,9 @@ class TradevineExtraImageUpload(http.Controller):
             time.sleep(2)
         _logger.warning("total attempted products {}".format(_count))
         return "total attempted products {}".format(_count)
+
+
+
 
     def _post_trade_me_listing_rule(self, provider_config,  product, resp={}, config_app=False, params=None):
         for rule in product.trade_me_listing_rule_ids.filtered(lambda r: r.ref_code and r.marketplace_product.ref_code):
@@ -583,6 +587,8 @@ class TradevineExtraImageUpload(http.Controller):
         
         
         
+        
+        
 class KoganExtraImageUpload(http.Controller):
     #------------------------------------------------------------------------#
     # This code uploads and reassigns product template extra medias to
@@ -643,8 +649,7 @@ class KoganExtraImageUpload(http.Controller):
                 if t_time < 60:
                     time.sleep(60 - t_time)                        
                 offset += limit
-        
-       
+
         return "success"
     
     
@@ -653,15 +658,15 @@ class KoganExtraImageUpload(http.Controller):
     @http.route('/marketplace/kogan/outofstockproducts', type='http', auth='public', csrf=False)
     def _get_kogan_outofstock_products(self):
         outofstocks = []
-        tv_products = request.env['product.template'].search([("type","=", "product")]).filtered(lambda p: p.marketplace_config_ids)
-        for tv_prod in tv_products:
-            for conf in tv_prod.marketplace_config_ids.filtered(lambda conf: conf.config_id.api_provider == 'kogan'):
+        kogan_products = request.env['product.template'].search([("type","=", "product")]).filtered(lambda p: p.marketplace_config_ids)
+        for kogan_prod in kogan_products:
+            for conf in kogan_prod.marketplace_config_ids.filtered(lambda conf: conf.config_id.api_provider == 'kogan'):
                 var_stocks = []
                 for loc in conf.config_id.location_ids:
-                    for variant in tv_prod.product_variant_ids:
+                    for variant in kogan_prod.product_variant_ids:
                         var_stocks.append(sum(variant.with_context({"location" : loc.id}).mapped("free_qty")))
                 if len(var_stocks)>0 and min(var_stocks) == 0:
-                    outofstocks.append(tv_prod.default_code or (tv_prod.x_studio_sku or tv_prod.display_name))
+                    outofstocks.append(kogan_prod.default_code or (kogan_prod.x_studio_sku or kogan_prod.display_name))
                     
         outofstocks = list(set(outofstocks))
         _logger.warning("Total Out of stock for kogan is {}".format(len(outofstocks)))
@@ -706,12 +711,14 @@ class KoganExtraImageUpload(http.Controller):
                                     'PhotoID {}'.format(resp.get('PhotoID'))
                                 )
                             time.sleep(1)
-
             except:
                 continue
 
         return "success"
     
+    
+    
+    # Pull Sale Order >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     @http.route('/marketplace/kogan/pull/sales', type='http', auth='public', csrf=False)
     def _cron_fetch_online_sale_order_kogan(self, **post):
         _count = 0
@@ -719,16 +726,22 @@ class KoganExtraImageUpload(http.Controller):
         request.env['kogan'].cron_fetch_online_sale_order_kogan(config)
         return "success"
     
+    
+    
+    # Stock Update >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     @http.route('/marketplace/kogan/stock/update', type='http', auth='public', csrf=False)
     def _post_kogan_product_stock_update(self, **post):
         _count = 0
-
         product_variants = request.env['product.product'].sudo().search([])
         for variant in product_variants.filtered(lambda v: len(v.product_tmpl_id.kogan_listing_rule_ids)>0 and len(v.marketplace_config_ids)>0):
             variant._call_to_update_marketplace_product_stock()
             _count += 1
             time.sleep(1.5)
         return "total attempted products {}".format(_count)
+
+
+
+
 
     @http.route('/marketplace/kogan/rule/update', type='http', auth='public', csrf=False)
     def _post_kogan_product_stock_update(self, **post):
@@ -751,6 +764,9 @@ class KoganExtraImageUpload(http.Controller):
         _logger.warning("total attempted products {}".format(_count))
         return "total attempted products {}".format(_count)
 
+
+
+
     def _post_kogan_listing_rule(self, provider_config,  product, resp={}, config_app=False, params=None):
         for rule in product.kogan_listing_rule_ids.filtered(lambda r: r.ref_code and r.marketplace_product.ref_code):
             data = {
@@ -760,7 +776,7 @@ class KoganExtraImageUpload(http.Controller):
                 'RuleName': rule.name,
                 'Title': rule.title,
                 'SubTitle': rule.subtitle,
-                'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
+                # 'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
                 'CategoryNumber': rule.category_number.marketplace_catg_ref_number,
                 # 'Description':str(rule.description)[:2047] or '',
                 'IsAutoListingEnabled': rule.is_auto_listing_enabled,
@@ -773,7 +789,6 @@ class KoganExtraImageUpload(http.Controller):
                 "SellMultipleQuantity": rule.buy_now_max_qty,
                 'StartPrice': rule.buy_now_price if rule.is_use_buy_now_enabled else rule.start_price,
                 'IsListingNew': rule.is_listing_new,
-
             }
             _logger.warning('_post_kogan_listing_rule data {}'.format(data))
             resp = self.env['marketplace.connector']._synch_with_marketplace_api(

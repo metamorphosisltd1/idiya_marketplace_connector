@@ -11,7 +11,7 @@ _logger = logging.getLogger(__name__)
 # fields and method to use api call
 MARKETPLACE_HOOK_FIELDS = {
     'trade_me_listing_rule_ids': '_trade_me_listing_rule',
-    'kogan_listing_rule_ids' : '',
+    'kogan_listing_rule_ids' : '_kogan_listing_rule',
 }
 
 class ProductTemplate(models.Model):
@@ -21,9 +21,12 @@ class ProductTemplate(models.Model):
     marketplace_brand_id = fields.Many2one('marketplace.product.brand', string='Trademe Brand', domain=[('config_id.api_provider', '=', 'tradevine')])
     
     kogan_brand_id = fields.Many2one('marketplace.product.brand', string='Kogan Brand', domain=[('config_id.api_provider', '=', 'kogan')])
+    kogan_category_id = fields.Many2one('marketplace.product.category', string='Kogan Category',  domain=[('marketplace_config_id.api_provider', '=', 'kogan')])
 
     themarket_brand_id = fields.Many2one('marketplace.product.brand', string='TheMarket Brand',  domain=[('config_id.api_provider', '=', 'themarket')])
     themarket_category_id = fields.Many2one('marketplace.product.category', string='TheMarket Category',  domain=[('marketplace_config_id.api_provider', '=', 'themarket')])
+
+
     is_manual_order_approval_needed = fields.Boolean(copy=False, help='''
         This is a product level flag which indicates that sales orders that contain this product
         should require manual approval before transitioning from Pending to Awaiting Shipment''')
@@ -31,10 +34,11 @@ class ProductTemplate(models.Model):
     marketplace_photo_id = fields.Char('TradeVine PhotoID', copy=False)
     photo_identifier = fields.Char('Marketplace Photo Identifier', copy=False)
     marketplace_inventory_adjustment_ids = fields.One2many('marketplace.inventory.adjustment.history', 'product_template_id', string="Inventory Adjustment History", copy=False)
+
     trade_me_listing_rule_ids = fields.One2many('trade.me.listing.rule', 'product_template_id', string='TradeMe Listing Rule')
     themarket_listing_rule_ids = fields.One2many('themarket.listing.rule', 'product_template_id', string='TheMarket Listing Rule')
-    kogan_listing_rule_ids = fields.One2many('', 'product_template_id', string='Kogan Listing Rule')
-
+    kogan_listing_rule_ids = fields.One2many('kogan.listing.rule', 'product_template_id', string='Kogan Listing Rule')
+    
     @api.model_create_multi
     def create(self, vals_list):
         templates = super(ProductTemplate, self).create(vals_list)

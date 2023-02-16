@@ -57,6 +57,73 @@
         </field>
     </record>
 
+
+
+    
+
+    <!-- Issue : Kogan Field Names   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> -->
+    <record id="marketplace_kogan_listing_rule_form" model="ir.ui.view">
+        <field name="name">kogan.listing.rule.view.form</field>
+        <field name="model">kogan.listing.rule</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <label class="oe_edit_only" for="name" string="Name" />
+                        <h1>
+                            <field name="name" placeholder="Rule Name" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="title" />
+                            <field name="subtitle" />
+                            <field name="category_number" string="Kogan Category" domain="[('child_id', '=', False)]" options="{'no_create_edit': True, 'no_open': True}" />
+                            <field name="product_template_id" />
+                            <field name="ref_code" />
+                            <field name="brand" />
+                        </group>
+                        <group>
+                            <field name="config_id" />
+                            <field name="is_auto_listing_enabled" />
+                            <field name="is_listing_new" />
+                            <field name="auto_listing_priority" />
+                            <field name="is_use_buy_now_enabled" />
+                            <field name="start_price" attrs="{'invisible': [('is_use_buy_now_enabled', '!=', False)]}" />
+                            <field name="buy_now_price" />
+                            <field name="buy_now_max_qty" attrs="{'invisible': [('is_use_buy_now_enabled', '=', False)]}" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description" name="rule_listing_description">
+                            <field name="description"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="marketplace_kogan_listing_rule_tree" model="ir.ui.view">
+        <field name="name">kogan.listing.rule.view.tree</field>
+        <field name="model">kogan.listing.rule</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name" />
+                <field name="config_id" />
+                <field name="category_number" />
+            </tree>
+        </field>
+    </record>
+
+
+
+
+
+
+
+
+<!-- The Market >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> -->
     <record id="marketplace_themarket_listing_rule_form" model="ir.ui.view">
         <field name="name">themarket.listing.rule.view.form</field>
         <field name="model">themarket.listing.rule</field>

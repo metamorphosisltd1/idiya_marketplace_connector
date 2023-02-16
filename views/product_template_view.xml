@@ -21,6 +21,15 @@
                     <field name="themarket_category_id" />
                </group>
             </xpath>
+
+
+            <!-- Kogan -->
+            <xpath expr="//group[@name='themarket']" position="after">
+                <group name="kogan" string="Kogan">
+                    <field name="kogan_brand_id"/>
+                    <field name="kogan_category_id" />
+                </group> 
+            </xpath>
             
             <xpath expr="//notebook" position="inside">
                 <page string="Marketplace Config" name="marketplace_config_ids">
@@ -36,6 +45,12 @@
                 <page string="TradeMe Listing Rule" name="trade_me_listing_rule_ids">
                     <field name="trade_me_listing_rule_ids" nolabel="1"/>
                 </page>
+
+                <!-- Kogan -->
+                <page string="Kogan Listing Rule" name="kogan_listing_rule_ids">
+                    <field name="kogan_listing_rule_ids" nolabel="1"/>
+                </page> 
+ 
                 <page string="TheMarket Listing Rule" name="themarket_listing_rule_ids">
                     <field name="themarket_listing_rule_ids" nolabel="1"/>
                 </page>

@@ -25,9 +25,6 @@
     <record id="model_sale_order_action_post_order_data" model="ir.actions.server">
         <field name="name">Create/Update Sale Order on Marketplace</field>
         <field name="model_id" ref="sale.model_sale_order"/>
-        <!-- TODO: remove this server actio, bcoz we do not want to use -->
-        <!-- <field name="binding_model_id" ref="sale.model_sale_order"/> -->
-        <!-- <field name="binding_view_types">form,list</field> -->
         <field name="state">code</field>
         <field name="code">action = records.action_post_sale_order_data_on_marketpalce()</field>
     </record>

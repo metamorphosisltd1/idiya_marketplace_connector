@@ -22,7 +22,7 @@
             </form>
         </field>
     </record>
-
+    
     <record id="marketplace_product_category_view_tree" model="ir.ui.view">
         <field name="name">marketplace.product.category.view.tree</field>
         <field name="model">marketplace.product.category</field>

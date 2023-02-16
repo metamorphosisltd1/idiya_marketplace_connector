@@ -754,10 +754,8 @@ class Tradevine(models.AbstractModel):
             product = product.product_template_id
 
 
-        for rule in product.trade_me_listing_rule_ids.filtered(lambda r: r.config_id.id == provider_config.id):
-            
+        for rule in product.trade_me_listing_rule_ids.filtered(lambda r: r.config_id.id == provider_config.id):            
             qty = self.get_stock_qtys(product, provider_config)
-            
             buy_now_qty = rule.buy_now_max_qty if rule.buy_now_max_qty != 0 else qty
             data = {
                 'TradeMeListingRuleID': rule.ref_code or None,

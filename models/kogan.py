@@ -2,11 +2,12 @@ import logging
 import random
 import json
 import time
+import requests
 import dateutil.parser
 import html2text
 import pytz
 from datetime import datetime, timedelta
-
+from werkzeug.urls import url_quote
 from odoo.exceptions import UserError
 from odoo import fields, models, _
 from odoo.osv import expression
@@ -20,8 +21,15 @@ class Kogan(models.AbstractModel):
     _description = 'Kogan API'
     
     
-    
-    
+ 
+ ###  Kogan Oauth >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _get_kogan_oauth_header(self, api_provider_config):
+        headers = {
+            'Accept': 'application/json',
+            'SellerToken': api_provider_config.seller_token,
+            'SellerID': api_provider_config.seller_id,
+        }
+        return headers
     
     
     
@@ -33,24 +41,25 @@ class Kogan(models.AbstractModel):
         return self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
-            service_endpoint='/products/%s' % product_id,
+            service_endpoint='products/%s' % product_id,
             params={},
             data={},
         )
 
+
     def _get_kogan_product_by_paged_list(self, provider_config, pageNumber=1, pageSize=499, **kwargs):
         ''' This method gets a paged list of top level product information, including summary inventory quantities. '''
-        params = {
-            'pageNumber': pageNumber,
-            'pageSize': pageSize,
-            **kwargs
-        }
+        # params = {
+        #     'pageNumber': pageNumber,
+        #     'pageSize': pageSize,
+        #     **kwargs
+        # }
         return self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
             service_endpoint='products',
-            params=params,
-            data={},
+            # params=params,
+            # data={},
         )
 
     def _get_kogan_order_by_paged_list(self, provider_config, pageNumber=1, pageSize=499, **kwargs):
@@ -415,11 +424,13 @@ class Kogan(models.AbstractModel):
             records |= records.create(categ)
             
             
+            
+# Load Kogan Categories for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _load_kogan_category_for_odoo(self, provider_config):
         resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
-            service_endpoint='category/',
+            service_endpoint='category',
             params={},
             data={},
             public_service_endpoint=True
@@ -438,8 +449,7 @@ class Kogan(models.AbstractModel):
     
 # Product for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _load_kogan_product_for_odoo(self, provider_config, pageNumber=1, pageSize=50):
-        response = self._get_kogan_product_by_paged_list(
-            provider_config, pageNumber, pageSize) or {}
+        response = self._get_kogan_product_by_paged_list(provider_config, pageNumber, pageSize) or {}
         total_product = response.get('CountTotal')
         load_product = 0
         product_obj = self.env['product.product']
@@ -516,7 +526,7 @@ class Kogan(models.AbstractModel):
         return self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
-            service_endpoint='/orders',
+            service_endpoint='orders',
             params=params,
             data={},
         )
@@ -585,7 +595,7 @@ class Kogan(models.AbstractModel):
             resp = self.env['marketplace.connector']._synch_with_marketplace_api(
                 api_provider_config=provider_config,
                 http_method='POST',
-                service_endpoint='/%s' % photoID if photoID else 'v1/Photo',
+                service_endpoint='Photo/%s' % photoID if photoID else 'v1/Photo',
                 params={},
                 data=json.dumps(image),
             )
@@ -729,7 +739,7 @@ class Kogan(models.AbstractModel):
             product = product.product_template_id
 
 
-        for rule in product.kogan_listing_rule_ids.filtered(lambda r: r.config_id.id == provider_config.id):
+        for rule in product.kogan_listing_rule_ids.filtered(lambda r: r.ref_code and r.marketplace_product.ref_code):
             
             qty = self.get_stock_qtys(product, provider_config)
             
@@ -741,7 +751,7 @@ class Kogan(models.AbstractModel):
                 'RuleName': rule.name,
                 'Title': rule.title,
                 'SubTitle': rule.subtitle,
-                'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
+                # 'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
                 'CategoryNumber': rule.category_number.marketplace_catg_ref_number,
                 'IsAutoListingEnabled': rule.is_auto_listing_enabled,
                 'AutoListingPriority': int(rule.auto_listing_priority),
@@ -755,12 +765,7 @@ class Kogan(models.AbstractModel):
                 'IsListingNew': rule.is_listing_new,
 
             }
-            if not rule.ref_code:
-                data.update({
-                'Description':html2text.html2text(product.description_sale)[:2000] or '',
-                })
-                
-            _logger.warning('_post_kogan_listing_rule data {}'.format(data))
+
             resp = self.env['marketplace.connector']._synch_with_marketplace_api(
                 api_provider_config=provider_config,
                 http_method='POST',
@@ -771,7 +776,6 @@ class Kogan(models.AbstractModel):
 
             if isinstance(resp, dict) and not resp.get('error_message'):
                 rule.ref_code = resp.get('KoganListingRuleID')
-            time.sleep(1)
             
             
             
@@ -818,7 +822,7 @@ class Kogan(models.AbstractModel):
         resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='POST',
-            service_endpoint='/products/%s' % ProductID if ProductID else '/products/',
+            service_endpoint='products/%s' % ProductID if ProductID else 'products/',
             params=params or {},
             data=json.dumps(data),
         )
@@ -966,7 +970,7 @@ class Kogan(models.AbstractModel):
         resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='POST',
-            service_endpoint='/SalesOrder/%s' % SaleOrderID if SaleOrderID else '/SalesOrder',
+            service_endpoint='SalesOrder/%s' % SaleOrderID if SaleOrderID else 'SalesOrder',
             params=params or {},
             data=json.dumps(data),
         )
@@ -1002,11 +1006,12 @@ class Kogan(models.AbstractModel):
         rule.ref_code = False
         return True
 
+
+
+
     # ============================================================
     # UPDATE PRODUCT STOCK WHEN SALE ORDER CONFIRM DIRECT BY ODOO
     # ============================================================
-
-
 
     def _prepare_product_post_stock_data(self, ConfigApp, product, location_ids=False, sale_order=False, default_type=None):
         inventory_entry = kogan_lookup.get_inventory_entry_type(
@@ -1076,7 +1081,7 @@ class Kogan(models.AbstractModel):
             resp = self.env['marketplace.connector']._synch_with_marketplace_api(
                 api_provider_config=config,
                 http_method='POST',
-                service_endpoint='/ProductInventory/%s/MakeAdjustment' % ProductID,
+                service_endpoint='ProductInventory/%s/MakeAdjustment' % ProductID,
                 params=params or {},
                 data=json.dumps(data),
             )

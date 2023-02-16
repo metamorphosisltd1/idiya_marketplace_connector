@@ -8,7 +8,7 @@ from odoo.addons.base.models.res_partner import _tz_get
 _logger = logging.getLogger(__name__)
 
 API_PROVIDER_END_POINT_URL = {
-    'kogan' : 'https://nimda-marketplace.aws.kgn.io/api/marketplace/v2/', #Kogan
+    'kogan' : 'https://nimda-marketplace.aws.kgn.io/api/marketplace/v2', #Kogan
     'tradevine' : 'https://api.tradevine.com',
     'themarket' : 'https://portal.themarket.com'
 }
@@ -18,7 +18,7 @@ class MarketPlaceConfigDetails(models.Model):
     _name = 'marketplace.config.details'
     _description = 'MarketPlace configuration details'
 
-
+ 
     def _get_api_provider(self):
         return [
             ('kogan', 'Kogan'),
@@ -95,7 +95,7 @@ class MarketPlaceConfigDetails(models.Model):
                     
                 elif config.api_provider == "kogan":
                     api_provider_obj._load_kogan_category_for_odoo(config) #Kogan
-                    api_provider_obj._load_kogan_brand_for_odoo
+                    # api_provider_obj._load_kogan_brand_for_odoo
                     
                 elif config.api_provider == "themarket":
                     api_provider_obj._load_themarket_category_for_odoo(config)

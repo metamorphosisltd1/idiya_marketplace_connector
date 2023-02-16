@@ -11,3 +11,5 @@ from . import res_partner
 from . import product_pricelist
 from . import stock_warehouse
 from . import themarket
+from . import kogan 
+from . import kogan_lookup
