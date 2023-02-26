@@ -17,15 +17,18 @@ MARKETPLACE_HOOK_FIELDS = {
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
+    description = fields.Char(string = "Product Description")
     marketplace_config_ids = fields.One2many('marketplace.product.template', 'product_template_id', string="Marketplace Application", copy=False)
     marketplace_brand_id = fields.Many2one('marketplace.product.brand', string='Trademe Brand', domain=[('config_id.api_provider', '=', 'tradevine')])
     
     kogan_brand_id = fields.Many2one('marketplace.product.brand', string='Kogan Brand', domain=[('config_id.api_provider', '=', 'kogan')])
     kogan_category_id = fields.Many2one('marketplace.product.category', string='Kogan Category',  domain=[('marketplace_config_id.api_provider', '=', 'kogan')])
+    product_sku = fields.Char(string="Extra Product SKU")
+    # enabled = fields.Boolean()
 
     themarket_brand_id = fields.Many2one('marketplace.product.brand', string='TheMarket Brand',  domain=[('config_id.api_provider', '=', 'themarket')])
     themarket_category_id = fields.Many2one('marketplace.product.category', string='TheMarket Category',  domain=[('marketplace_config_id.api_provider', '=', 'themarket')])
-
+ 
 
     is_manual_order_approval_needed = fields.Boolean(copy=False, help='''
         This is a product level flag which indicates that sales orders that contain this product

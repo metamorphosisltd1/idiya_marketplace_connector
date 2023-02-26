@@ -1,6 +1,7 @@
 from copy import copy
 import logging
 
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 from odoo.addons.base.models.res_partner import _tz_get
@@ -58,8 +59,6 @@ class MarketPlaceConfigDetails(models.Model):
     label = fields.Char(compute="_compute_label_for_sync_data")
     tz = fields.Selection(_tz_get, string='Timezone', readonly=False, default=lambda config: config.env.user.tz)  
     location_ids = fields.Many2many('stock.location', string="Inventory Location", copy=False, help='Please select all the inventory locations that you want to sell products on this Marketplace only')
-
-
     # for sync details of cron
     created_from = fields.Date()
     created_to = fields.Date()
@@ -84,6 +83,8 @@ class MarketPlaceConfigDetails(models.Model):
         for config in self:
             config.label = 'Import Data from %s' % config.api_provider
 
+
+# Category for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     @api.model_create_multi
     def create(self, vals_list):
         records = super(MarketPlaceConfigDetails, self).create(vals_list)
@@ -95,13 +96,15 @@ class MarketPlaceConfigDetails(models.Model):
                     
                 elif config.api_provider == "kogan":
                     api_provider_obj._load_kogan_category_for_odoo(config) #Kogan
-                    # api_provider_obj._load_kogan_brand_for_odoo
+                    api_provider_obj._load_kogan_brand_for_odoo(config)
                     
                 elif config.api_provider == "themarket":
                     api_provider_obj._load_themarket_category_for_odoo(config)
                     api_provider_obj._load_themarket_brands_for_odoo(config)
                     api_provider_obj._load_themarket_colors_for_odoo(config)
         return records
+
+
 
     def action_test_connection(self):
         api_provider_obj = self.env['%s' % self.api_provider]
@@ -114,31 +117,35 @@ class MarketPlaceConfigDetails(models.Model):
                     msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('TotalCount'), self.api_provider))
                     
                 elif self.api_provider == 'kogan': #Kogan
-                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('CountTotal'), self.api_provider))
-                    
-                    
+                    api_provider_obj._load_kogan_category_for_odoo(self) #Kogan
+                    api_provider_obj._load_kogan_brand_for_odoo(self)
+                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('body').get('count'), self.api_provider))
+         
                 elif self.api_provider == 'themarket':
                     api_provider_obj._load_themarket_brands_for_odoo(self)
                     msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 raise UserError(msg)
-                
-            raise UserError(response.get('error_message'))
+            _logger.info('{}'.format(msg))
+            raise UserError(response.get('detail'))
+        
+
 
     def action_get_product(self):
         api_provider_obj = self.env['%s' % self.api_provider]
         if hasattr(api_provider_obj, '_load_%s_product_for_odoo' % self.api_provider):
-            response = getattr(api_provider_obj, '_load_%s_product_for_odoo' % self.api_provider)(self)
+            response = getattr(api_provider_obj, '_load_%s_product_for_odoo' % self.api_provider)(self) 
             msg = response.get('error_message')
             if isinstance(response, dict) and not response.get('error_message'):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('TotalCount'), self.api_provider))
                 elif self.api_provider == 'kogan':
-                    msg = _('Successfully Imported %s products from your %s account!' % (response.get('CountTotal'), self.api_provider))
+                    msg = _('Successfully Imported %s products from your %s account!' % (response.get('body').get('count'), self.api_provider))
                 elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 _logger.info('{}'.format(msg))
             else:
                 _logger.error('{}'.format(msg))
+
 
     def action_get_order(self):
         api_provider_obj = self.env['%s' % self.api_provider]
@@ -149,12 +156,13 @@ class MarketPlaceConfigDetails(models.Model):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('TotalCount'), self.api_provider))
                 elif self.api_provider == 'kogan':
-                    msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('CountTotal'), self.api_provider))
+                    msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('body').get('count'), self.api_provider))
                 elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 _logger.info('{}'.format(msg))
             else:
                 _logger.error('{}'.format(msg))
+
 
     def cron_fetch_online_sale_order_from_marketplace(self):
         for config in self.search([]):

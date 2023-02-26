@@ -1,8 +1,5 @@
-# -*- encoding: utf-8 -*-
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 import logging
-
+from odoo.exceptions import UserError
 from odoo import api, fields, models, _
 
 _logger = logging.getLogger(__name__)
@@ -22,13 +19,27 @@ class MarketplaceConfigWizard(models.TransientModel):
         for config in self.marketplace_config_ids:
             api_provider_name = config.api_provider
             api_provider_obj = self.env['%s' % api_provider_name]
-            if hasattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method)):
-                for record in records:
-                    response = getattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method))(config, record, config_field)
-                    msg = _('Successfully %s(s) Uploaded on %s!' % (method, api_provider_name))
-                    if isinstance(response, dict) and not response.get('error_message'):
-                        _logger.info('{}'.format(msg))
-                    else:
-                        _logger.info('{}'.format(msg))
+            
+            if api_provider_name=="kogan":
+                if len(records) > 500:
+                    raise UserError(_("Can't push more than 500 Products."))
+                else:
+                    if hasattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method)):
+                        response = getattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method))(config, records, config_field)
+                        msg = _('Successfully %s(s) Uploaded on %s!' % (method, api_provider_name))
+                        if isinstance(response, dict) and not response.get('error_message'):
+                            _logger.info('{}'.format(msg))
+                        else:
+                            _logger.info('{}'.format(msg))
+                        
 
+            else:
+                if hasattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method)):
+                    for record in records:
+                        response = getattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method))(config, record, config_field)
+                        msg = _('Successfully %s(s) Uploaded on %s!' % (method, api_provider_name))
+                        if isinstance(response, dict) and not response.get('error_message'):
+                            _logger.info('{}'.format(msg))
+                        else:
+                            _logger.info('{}'.format(msg))
         return {'type': 'ir.actions.act_window_close'}

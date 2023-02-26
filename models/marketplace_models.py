@@ -32,6 +32,9 @@ class MarketPlacePartner(models.Model):
     default_shipping_address_id = fields.Char('Shipping Address', copy=False)
 
 
+
+
+
 class MarketPlaceProductTemplate(models.Model):
     _name = 'marketplace.product.template'
     _inherit = 'marketplace.marketplace'
@@ -51,6 +54,9 @@ class MarketPlaceProductTemplate(models.Model):
     @api.onchange('product_template_id')
     def _onchange_product_template_id(self):
         self.name = self.product_template_id.name
+
+
+
 
 
 class MarketPlaceOrder(models.Model):
@@ -76,12 +82,12 @@ class MarketPlaceOrderLine(models.Model):
 class MarketPlaceProductCategory(models.Model):
     _name = 'marketplace.product.category'
     _description = 'Marketplace Product Category'
-    _parent_name = "parent_id"
-    _parent_store = True
+    # _parent_name = "parent_id"
+    # _parent_store = True
     _rec_name = 'complete_name'
     _order = 'complete_name'
 
-    name = fields.Char(required=True, index=True,)
+    name = fields.Char(required=True, index=True)
     complete_name = fields.Char('Complete Name', compute='_compute_complete_name', store=True)
     marketplace_catg_ref_number = fields.Char(string='Category Number', readonly=True, required=True)
     marketplace_path = fields.Char()
@@ -90,13 +96,14 @@ class MarketPlaceProductCategory(models.Model):
         'marketplace.product.category', string='Parent', index=True, 
         domain="[('marketplace_config_id', '=', marketplace_config_id)]",
         ondelete='cascade'
-    )
+    ) 
     parent_path = fields.Char(index=True)
     child_id = fields.One2many('marketplace.product.category', 'parent_id', 'Child Categories')
     active = fields.Boolean(default=True)
     product_count = fields.Integer(
         '# Products', compute='_compute_product_count',
         help="The number of products under this category (Does not consider the children categories)")
+
 
     @api.constrains('parent_id')
     def _check_parent_id(self):
@@ -121,10 +128,13 @@ class MarketPlaceProductCategory(models.Model):
                 product_count += group_data.get(sub_categ_id, 0)
             categ.product_count = product_count
 
-
     @api.model
     def name_create(self, name):
         return self.create({'name': name}).name_get()[0]
+
+
+
+
 
 
 class MarketplaceProductBrand(models.Model):
@@ -270,7 +280,7 @@ class KoganListingRule(models.Model):
     productID = fields.Char()
     description = fields.Text(related='product_template_id.description_sale', string="Description")
     brand = fields.Many2one('marketplace.product.brand', string='Marketplace Brand', related='product_template_id.marketplace_brand_id',domain=[('config_id.api_provider', '=', 'kogan')], readonly=False)
-    category_number = fields.Many2one('marketplace.product.category', related='product_template_id.kogan_category_id', string='Kogan Category', required=True)
+    category_number = fields.Many2one('marketplace.product.category',string='Kogan Category', required=True)
     is_listing_new = fields.Boolean(string='Brand new', default=True, help="Uncheck this box if this product is Used condition.")
 
 

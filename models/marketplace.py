@@ -43,10 +43,12 @@ class MarketPlaceConnector(models.AbstractModel):
                 headers = getattr(api_provider_obj, '_get_%s_oauth_header' % api_provider)(api_provider_config)
             if len(files) > 0:
                 headers.pop('Content-Type')
+            # elif len(data)> 0 and  json.loads(data):
+            #     headers['Content-Type'] = "application/json"
 
         response = {}
         try:
-            # _logger.warning('sent data for {}:{} \n params: {}\n data: {}'.format(http_method,service_url, params,data))
+            _logger.warning('sent data for {}:{} \n params: {}\n data: {}\n with header:{} '.format(http_method,service_url, params,data,headers))
             resp = requests.request(
                 http_method, service_url,
                 headers=headers,
@@ -55,7 +57,7 @@ class MarketPlaceConnector(models.AbstractModel):
                 files=files,
                 timeout=TIMEOUT)
             _logger.warning('request url : {}'.format(resp.url))
-            _logger.warning('response from marketplace post/get (HTTP status {})'.format(resp.content))
+            # _logger.warning('response from marketplace post/get (HTTP status {})'.format(resp.content))
             resp.raise_for_status()
             if resp.text != 'null' and bool(resp.text):
                 if isinstance(resp.content, str):

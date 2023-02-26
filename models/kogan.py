@@ -6,12 +6,14 @@ import requests
 import dateutil.parser
 import html2text
 import pytz
+import base64
 from datetime import datetime, timedelta
 from werkzeug.urls import url_quote
 from odoo.exceptions import UserError
 from odoo import fields, models, _
 from odoo.osv import expression
 from ...marketplace_connector.models import kogan_lookup
+
 
 _logger = logging.getLogger(__name__)
 
@@ -26,56 +28,136 @@ class Kogan(models.AbstractModel):
     def _get_kogan_oauth_header(self, api_provider_config):
         headers = {
             'Accept': 'application/json',
+            'Content-Type': 'application/json',
             'SellerToken': api_provider_config.seller_token,
             'SellerID': api_provider_config.seller_id,
         }
         return headers
     
-    
+
+
+
+# Category for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>        
+    def _import_category_from_kogan(self, config, datas):
+        # _logger.info("_import_category_from_kogan with {} categories".format(len(datas)))
+        categories = [{
+            'name': data['title'],
+            'parent_id': False,
+            'parent_number': data['parent_category'],
+            'marketplace_catg_ref_number': data['id'],
+            'marketplace_path': data['url'],
+            'marketplace_config_id': config.id,
+        } for data in datas]
+        records = self.env['marketplace.product.category']
+        # _logger.info("_import_category_from_kogan with {} categories".format(len(categories)))
+
+        for categ in categories: 
+            parent = records.search([('marketplace_catg_ref_number', '=', categ.get(
+                'parent_number'))])
+            if parent:
+                categ['parent_id'] = parent.id
+            categ.pop('parent_number')
+            kogan_categ = records.search([['marketplace_catg_ref_number', '=', categ['marketplace_catg_ref_number']]], limit=1)
+            if not kogan_categ:
+                records |= records.create(categ)
+                # _logger.info("_import_category_from_kogan records |= records.create(categ) {}".format(records))
+            else:
+                kogan_categ.write(categ)
+                # _logger.info("_import_category_from_kogan kogan_categ.write(categ) {}".format(kogan_categ))
+                
+            self.env.cr.commit()
+          
+               
+# Load Kogan Categories for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _load_kogan_category_for_odoo(self, provider_config):
+        _logger.info("_load_kogan_category_for_odoo loaded with {}".format(provider_config))
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='GET',
+            service_endpoint='category',
+            params={"display_all":1},
+        )
+        if isinstance(resp, dict) and not resp.get('error_message'):
+            body = resp.get('body', False)
+            if body:
+                self._import_category_from_kogan(provider_config, body["results"])
+            
+        return resp 
+
+
+     
+     
+# Brand for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>        
+    def _import_brand_from_kogan(self, config, datas):
+        brands = [{
+            'name': data['title'],
+            'config_id': config.id,
+            'description': data['description'],
+            'ref_code': data['id']
+        } for data in datas]
+        records = self.env['marketplace.product.brand']
+
+        for brand in brands: 
+            kogan_brand = records.search([['ref_code', '=', brand['ref_code']]], limit=1)
+            if not kogan_brand:
+                records |= records.create(brand)
+            else:
+                kogan_brand.write(brand)
+             
+            self.env.cr.commit()
+          
+
+
+            
+# Load Kogan Brands for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _load_kogan_brand_for_odoo(self, provider_config):
+        # _logger.info("_load_kogan_brand_for_odoo loaded with {}".format(provider_config))
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='GET',
+            service_endpoint='brand',
+            params={"display_all":1},
+        )
+        if isinstance(resp, dict) and not resp.get('error_message'):
+            body = resp.get('body', False)
+            if body:
+                self._import_brand_from_kogan(provider_config, body["results"])
+            
+        return resp 
+
+     
+     
+     
     
 #GET PRODUCT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _get_kogan_product_by_id(self, provider_config, product_id, **kwargs):
         '''This method gets an individual product specified by the supplied ID - 
             the output consists of top level product information, including summary inventory quantities
         '''
-        return self.env['marketplace.connector']._synch_with_marketplace_api(
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
             service_endpoint='products/%s' % product_id,
-            params={},
-            data={},
+            params={"enabled":1}
         )
+        if isinstance(resp, dict) and not resp.get('error_message'):
+            body = resp.get('body', False)
+            if body:
+                return body['results']
 
-
-    def _get_kogan_product_by_paged_list(self, provider_config, pageNumber=1, pageSize=499, **kwargs):
+    def _get_kogan_product_by_paged_list(self, provider_config, **kwargs):
         ''' This method gets a paged list of top level product information, including summary inventory quantities. '''
-        # params = {
-        #     'pageNumber': pageNumber,
-        #     'pageSize': pageSize,
-        #     **kwargs
-        # }
-        return self.env['marketplace.connector']._synch_with_marketplace_api(
+
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
             service_endpoint='products',
-            # params=params,
-            # data={},
+            params = {"enabled":1}
         )
-
-    def _get_kogan_order_by_paged_list(self, provider_config, pageNumber=1, pageSize=499, **kwargs):
-        ''' This method gets a paged list of top level product information, including summary inventory quantities. '''
-        params = {
-            'pageNumber': pageNumber,
-            'pageSize': pageSize,
-            **kwargs
-        }
-        return self.env['marketplace.connector']._synch_with_marketplace_api(
-            api_provider_config=provider_config,
-            http_method='GET',
-            service_endpoint='products',
-            params=params,
-            data={},
-        )
+        if isinstance(resp, dict) and not resp.get('error_message'):
+            body = resp.get('body', False)
+            if body:
+                return body['results']
 
     def _get_kogan_product(self, provider_config, product_id=None, **kwargs):
         if product_id:
@@ -84,17 +166,414 @@ class Kogan(models.AbstractModel):
             return self._get_kogan_product_by_paged_list(provider_config, **kwargs)
 
 
+    
+# Product for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _load_kogan_product_for_odoo(self, provider_config, pageNumber=1, pageSize=50):
+        resp = self._get_kogan_product_by_paged_list(provider_config) or {}
+        for response in resp :
+            total_product = response.get('count')
+            load_product = 0
+            product_obj = self.env['product.product']
+            marketplace_product_obj = self.env['marketplace.product.template']
+            uom = self.env['uom.uom']
+            check_barcode_duplicate = []
+            while True:
+                product_values = []
+                if response and ((total_product - load_product) > 0):
+                    for product in response :
+                        ProductID = product.get('product_sku')
+                        domain = [
+                            ('marketplace_config_ids.ref_code', '=', ProductID)]
+                        if product.get('Barcode'):
+                            check_barcode_duplicate.append(product['Barcode'])
+                            domain = expression.OR(
+                                [domain, [('barcode', '=', product['Barcode'])]])
+                        if not product_obj.search(domain, limit=1):
+                            vals = self._prepare_product_values(product, provider_config)
+                            if vals.get('barcode') in check_barcode_duplicate or not product.get('Barcode'):
+                                vals.pop('barcode')
+
+                            marketplace_order = marketplace_product_obj.search(
+                                [('ref_code', '=', ProductID)], limit=1)
+                            if vals:
+                                if product.get('UnitOfMeasure'):
+                                    uom = uom.search(
+                                        [('name', '=', product['UnitOfMeasure'])], limit=1)
+                                    if uom:
+                                        vals.update({'uom_id': uom.id})
+                                if not marketplace_order:
+                                    vals.update({
+                                        'marketplace_config_ids': [(0, 0, {
+                                            'name': provider_config.name,
+                                            'config_id': provider_config.id,
+                                            'category_ref_id': product.get('ProductCategoryID'),
+                                            'ref_code': ProductID,
+                                        })]
+                                    })
+                                else:
+                                    vals.update({'marketplace_config_ids': [
+                                                (4, marketplace_order.id)]})
+
+                                product_values.append(vals)
+                    if product_values:
+                        product_obj.create(product_values)
+                        product_obj.env.cr.commit()
+
+                    load_product += len(response)
+                    if load_product != total_product:
+                        # pageNumber += 1
+                        response = self._get_kogan_product_by_paged_list(
+                            provider_config, pageNumber, pageSize) or {}
+                else:
+                    break
+            return response
 
 
 
-#GET PRODUCT Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>)))))))) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                           ########### PUSH PRODUCT >>>>>>>>>>
+
+# Update product Stock >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _update_kogan_product_stock(self, config, product, location_ids=False, sale_order=False, params=None):
+        ConfigApp = product.mapped('marketplace_config_ids').filtered(
+            lambda m_config: m_config.config_id == config and m_config.ref_code)
+        ProductID = ConfigApp.mapped("ref_code")[-1] if ConfigApp else False
+        _logger.warning("Updating stock of {} : {} ref {}".format(product.name, product.id, ProductID))
+        if ProductID:
+            data = self._prepare_product_post_stock_data(
+                ConfigApp, product, location_ids, sale_order)
+            data.update({'ProductID': ProductID})
+
+            _logger.warning("kogan ProductInventory MakeAdjustment body {}".format(json.dumps(data)))
+            resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+                api_provider_config=config,
+                http_method='POST',
+                service_endpoint='products/stockprice',
+                params=params or {},
+                data=json.dumps(data),
+            )
+            if isinstance(resp, dict) and not resp.get('error_message'):
+                self._prepare_product_update_vals(
+                    config, ConfigApp, product, resp)
+            return resp
+        return {'error_message': _('Product ID is missing for kogan stock adjustment')}
+    
+    
+    
+    
+    def _prepare_product_post_stock_data(self, ConfigApp, product, location_ids=False, sale_order=False, default_type=None):
+        if sale_order:
+            default_type = 36009
+            qty = 0 
+            for loc in location_ids:
+                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
+
+            inventory_adjustment_note = _(
+                'Odoo Increase/Reduce Stock Product Inventory due to sale order %s' % qty)
+                
+        else:
+            default_type = 36009
+            qty = 0 
+            for loc in location_ids:
+                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
+            
+            inventory_adjustment_note = _(
+                'Odoo Increase/Reduce Stock Product Inventory %s' % qty)
+
+        if isinstance(qty, (list, tuple)):
+            qty = qty[0]
+        _logger.warning("Quantity Found of {} : {}; location_id {} quantity {}".format(product._name, product.id,location_ids.ids, qty))
+        values = {
+            'ProductID': ConfigApp.ref_code,
+            'ProductCode': product.code if product._name == 'product.product' and product.code else None,
+            'InventoryType': default_type,
+            'QuantityChange': None,
+            'ProductCostPrice': product.list_price,
+            'QuantityInStockSnapshot' : qty,
+            'Notes': sale_order.inventory_adjustment_note if sale_order and sale_order.inventory_adjustment_note else inventory_adjustment_note,
+            'WarehouseID': None,
+            'WarehouseCode': None,
+            'TransferFromWarehouseID': None,
+            'TransferFromWarehouseCode': None,
+            'TransferToWarehouseID': None,
+            'TransferToWarehouseCode': None,
+            'QueueInventorySummaryUpdates': None
+        }
+        return values
+
+
+
+
+
+
+
+# Product Async Task >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _get_product_async_task(self, provider_config, ConfigApp, product, resp, data):
+        
+        if resp.get('pending_url'):
+            task_url = resp.get('pending_url')
+            task_id = task_url.split("/")[-2]
+            asnc_task = self.env['marketplace.connector']._synch_with_marketplace_api(
+                api_provider_config=provider_config,
+                http_method='GET',
+                service_endpoint='task/%s' %task_id,
+                params= {"task_id": task_id}
+            )
+            
+            if isinstance(asnc_task, dict) and (asnc_task.get('status') == "AsyncResponsePending"):
+                raise UserError("{}".format(json.dumps(asnc_task.get("status"))))
+            elif isinstance(asnc_task, dict) and (asnc_task.get('status') == "CompleteWithErrors"):
+                raise UserError("{}".format(json.dumps(asnc_task.get("body").get("errors"))))
+            else:
+                raise UserError("Product pushed to Kogan Successfully ...")
+            # return asnc_task
+
+
+
+# Product Update Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _prepare_product_update_vals(self, provider_config, ConfigApp, product, data):
+        if ConfigApp:
+            value = {
+                'category_ref_id': product.kogan_category_id.marketplace_catg_ref_number,
+                'ref_code': data[0]['product_sku'],
+                'product_template_qty' : data[0]['stock'],
+            }
+            return ConfigApp.write(value)
+        else:
+            return self.env['marketplace.product.template'].create({
+                'name': provider_config.api_provider,
+                'ref_code': data[0]['product_sku'],
+                'config_id': provider_config.id,
+                'product_template_id': product.id if product._name == 'product.template' else False,
+                'product_id': product.id if product._name == 'product.product' else product.product_variant_id.id,
+                'category_ref_id': product.kogan_category_id.marketplace_catg_ref_number
+            })
+
+
+# Product Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _prepare_product_post_data(self, provider_config, products):
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        products_list = []
+        variant = {}
+        for product in products:
+            taxes_id = product.taxes_id
+            if not taxes_id:
+                taxes_id = self.env['account.tax'].sudo().search([['id','=',2]])
+                product.taxes_id = [(4,taxes_id.id)]
+            
+            images = []
+            if product._get_images():
+                for image in product._get_images():
+                    image_url = "{}/web/image?model={}&field=image_1920&id={}".format(base_url,image._name,image.id)
+                    images.append(image_url)
+            
+            facet_list = []
+            if product.attribute_line_ids:
+                for line in product.attribute_line_ids:
+                    items = []
+                    for item in line.value_ids:
+                        items.append({
+                            "type" : line.attribute_id.name,
+                            "value" : item.name
+                            })
+                        
+                    facet_list.append({
+                        "group" : "{} {}".format(product.name,line.attribute_id.name),
+                        "items" : items
+                    })
+
+
+                    variant_base = {"group_title": "{} variation".format(product.name),
+                                    "group_id": "{} id".format(product.name)}
+                    for i, f in enumerate(facet_list):
+                        vary_on_values = {
+                            "group" : f["group"],
+                            "type" : f["items"][0]["type"]
+                        }
+                        vary_on_keys = "vary_on_{}".format(i+1)
+                        vary_on_dict = {vary_on_keys:vary_on_values}
+                        variant_base.update(vary_on_dict)
+                        
+                
+                
+                
+                
+
+            products_list.append({
+                'product_sku': product.default_code if product.default_code else product.product_sku,
+                'product_title': product.name or product.display_name,
+                'product_description' : product.description,
+                'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
+                'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
+                'stock' : product.qty_available,
+                "offer_data" : {
+                                "NZD": {"price":product.list_price,
+                                        "handling_days": 0}},
+                "product_dimensions" : {
+                                        "Weight":product.weight,
+                                        "Volume" : product.volume },
+                'enabled': product.is_published,
+                'brand': product.kogan_brand_id.name,   
+                "facets" : facet_list,
+                "variant": variant_base or {}
+            })
+        raise UserError("{}".format(json.dumps(products_list)))
+        return products_list
+    
+        
+                
+# Post Kogan Product >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _post_kogan_product(self, provider_config, product, config_field):
+        ConfigApp = product.mapped('%s' % config_field).filtered(
+            lambda config: config.config_id == provider_config)
+        ProductID = ConfigApp.ref_code if ConfigApp else False
+        data = self._prepare_product_post_data(
+            provider_config, product)
+
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='POST',
+            service_endpoint='products/%s' % ProductID if ProductID else 'products/',
+            data=json.dumps(data)
+        )
+
+
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            self._get_product_async_task(
+                provider_config, ConfigApp, product, resp, data)
+            self._prepare_product_update_vals(
+                provider_config, ConfigApp, product, data)
+        else:
+            raise UserError("{}".format(json.dumps(resp.get("error"))))
+        return resp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def _get_status_for_order(self):
+        pass
+
+    def _get_all_open_order(self, provider_config, params):
+        params = {
+            'status': self._get_status_for_order(),
+        }
+        return self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='GET',
+            service_endpoint='orders',
+            params=params,
+            data={},
+        )
+        
+        
+        
+    def _get_kogan_order_ref(self):
+        pass
+    
+    def _get_order_by_id(self, provider_config, params):
+        params = {
+            "kogan_order_ref" : self._get_kogan_order_ref()
+        }
+        return self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='GET',
+            service_endpoint='orders',
+            params=params,
+            data={},
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Prepare PRODUCT Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>)))))))) 
     def _prepare_product_values(self, product_values, config):
         currency = self.env['res.currency']
         marketplace_brand = self.env['marketplace.product.brand']
-        if product_values.get('Currency'):
-            currency_name = kogan_lookup.get_currency(
-                product_values['Currency'])
-            currency = currency.search([('name', '=', currency_name)], limit=1)
+
         if product_values.get('brand'):
             marketplace_brand = marketplace_brand.search(
                 [('name', '=', product_values['brand'])], limit=1)
@@ -106,27 +585,19 @@ class Kogan(models.AbstractModel):
                     })
 
         return {
-            'name': product_values['Name'],
-            'code': product_values['Code'],
-            'barcode': product_values['Barcode'],
-            'description': product_values.get('Description'),
-            'description_sale': product_values.get('ExternalNotes'),
-            'default_code': product_values.get('AlternateCode'),
-            'standard_price': product_values.get('CostPrice'),
-            'lst_price': product_values.get('SellPrice'),
-            'list_price': product_values.get('SellPrice'),
-            'weight': product_values.get('Weight'),
+            'name': product_values['product_title'],
+            'code': product_values['product_sku'],
+            'description': product_values.get('product_description'),
+            'description_sale': product_values.get('product_inbox'),
+            'standard_price': product_values.get('offer_data').get("NZD").get("price"),
+            'lst_price': product_values.get('offer_data').get("NZD").get("price"),
+            'list_price': product_values.get('offer_data').get("NZD").get("price"),
+            'weight': product_values.get('product_dimensions').get("weight"),
             'currency_id': currency.id,
             'marketplace_brand_id': marketplace_brand.id if marketplace_brand else product_values.get('brand'),
-            'is_manual_order_approval_needed': product_values.get('IsManualOrderApprovalNeeded'),
-            'active': not product_values.get('IsArchived'),
-            'marketplace_enable_inventory': product_values.get('EnableInventory'),
+            'active': not product_values.get('enabled')
         }
-    
-    
-    
-    
-    
+      
     
 #GET Customer Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_customer_values(self, customer_values, billing_address, shipping_address):
@@ -206,10 +677,6 @@ class Kogan(models.AbstractModel):
                     customers[i] = new_customer
                 i += 1
         return tuple(customers)
-    
-
-
-
 
 
 # New Customer Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
@@ -290,10 +757,6 @@ class Kogan(models.AbstractModel):
     
     
     
-    
-    
-    
-    
 #Prepare order line >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_order_line_values(self, config, order_line_values):
         product_obj = self.env['product.product']
@@ -329,11 +792,6 @@ class Kogan(models.AbstractModel):
                 'price_unit': order_line_value.get('SellPrice')
             }))
         return vals
-    
-    
-    
-    
-    
     
     
 #Prepare Order Values >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -377,143 +835,7 @@ class Kogan(models.AbstractModel):
             'partner_invoice_id': invoice_address.id or customer.id,
             'partner_shipping_id': shipping_address.id or customer.id,
         }
-    
-
-
-
-
-
-
-
-# Category for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _import_category_from_kogan(self, config, datas, level=0):
-        categories = [{
-            'name': datas['Name'],
-            'parent_id': False,
-            'parent_number': False,
-            'marketplace_catg_ref_number': datas['Number'],
-            'marketplace_path': datas['Path'],
-            'marketplace_config_id': config.id,
-        }]
-
-        def get_subcategories(subcategory, parent_name, parent_number, level):
-            res = []
-            for data in subcategory:
-                res.append({
-                    'name': data.get('Name'),
-                    'parent_id': parent_name,
-                    'parent_number': parent_number,
-                    'marketplace_catg_ref_number': data.get('Number'),
-                    'marketplace_path': data.get('Path'),
-                    'marketplace_config_id': config.id,
-                })
-                if not data['IsLeaf']:
-                    res.extend(get_subcategories(
-                        data['Subcategories'], data['Name'], data['Number'], level+1))
-            return res
-
-        categories.extend(get_subcategories(
-            datas['Subcategories'], datas['Name'], datas['Number'], 1))
-        records = self.env['marketplace.product.category']
-        for categ in categories:
-            parent = records.search([('marketplace_catg_ref_number', '=', categ.get(
-                'parent_number')), ('name', '=', categ.get('parent_id'))])
-            if parent:
-                categ['parent_id'] = parent.id
-            categ.pop('parent_number')
-            records |= records.create(categ)
-            
-            
-            
-# Load Kogan Categories for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _load_kogan_category_for_odoo(self, provider_config):
-        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
-            api_provider_config=provider_config,
-            http_method='GET',
-            service_endpoint='category',
-            params={},
-            data={},
-            public_service_endpoint=True
-        )
-        if isinstance(resp, dict) and not resp.get('error_message'):
-            self._import_category_from_kogan(provider_config, resp)
-        return resp
-    
-    
-    
-    
-    
-    
-    
-    
-    
-# Product for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _load_kogan_product_for_odoo(self, provider_config, pageNumber=1, pageSize=50):
-        response = self._get_kogan_product_by_paged_list(provider_config, pageNumber, pageSize) or {}
-        total_product = response.get('CountTotal')
-        load_product = 0
-        product_obj = self.env['product.product']
-        marketplace_product_obj = self.env['marketplace.product.template']
-        uom = self.env['uom.uom']
-        check_barcode_duplicate = []
-        while True:
-            product_values = []
-            if response.get('List') and (total_product - load_product) > 0:
-                for product in response['List']:
-                    ProductID = product.get('ProductID')
-                    domain = [
-                        ('marketplace_config_ids.ref_code', '=', ProductID)]
-                    if product.get('Barcode'):
-                        check_barcode_duplicate.append(product['Barcode'])
-                        domain = expression.OR(
-                            [domain, [('barcode', '=', product['Barcode'])]])
-                    if not product_obj.search(domain, limit=1):
-                        vals = self._prepare_product_values(product, provider_config)
-                        if vals.get('barcode') in check_barcode_duplicate or not product.get('Barcode'):
-                            vals.pop('barcode')
-
-                        marketplace_order = marketplace_product_obj.search(
-                            [('ref_code', '=', ProductID)], limit=1)
-                        if vals:
-                            if product.get('UnitOfMeasure'):
-                                uom = uom.search(
-                                    [('name', '=', product['UnitOfMeasure'])], limit=1)
-                                if uom:
-                                    vals.update({'uom_id': uom.id})
-                            if not marketplace_order:
-                                vals.update({
-                                    'marketplace_config_ids': [(0, 0, {
-                                        'name': provider_config.name,
-                                        'config_id': provider_config.id,
-                                        'category_ref_id': product.get('ProductCategoryID'),
-                                        'ref_code': ProductID,
-                                    })]
-                                })
-                            else:
-                                vals.update({'marketplace_config_ids': [
-                                            (4, marketplace_order.id)]})
-
-                            product_values.append(vals)
-                if product_values:
-                    product_obj.create(product_values)
-                    product_obj.env.cr.commit()
-
-                load_product += len(response['List'])
-                if load_product != total_product:
-                    pageNumber += 1
-                    response = self._get_kogan_product_by_paged_list(
-                        provider_config, pageNumber, pageSize) or {}
-            else:
-                break
-        return response
-    
-    
-    
-    
-    
-    
-    
-    
+        
     
 #Order for odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _get_kogan_order_by_paged_list(self, provider_config, pageNumber=1, pageSize=499, **kwargs):
@@ -580,266 +902,6 @@ class Kogan(models.AbstractModel):
                 break
         return response
     
-
-
-
-# Product Photo Post Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _prepare_product_photo_post_data(self, provider_config, product, photoID=None):
-        _logger.warning('Kogan product {}, {}, PhotoID {}'.format(product._name, product.id, photoID))
-        photos = []
-        if product.image_1920:
-            image = {
-                "FileName": "{}_{}.jpeg".format(product.default_code or product.x_studio_sku, random.randrange(10000,100000)),
-                "ContentsBase64": product.image_1920.decode('utf-8'),
-            }
-            resp = self.env['marketplace.connector']._synch_with_marketplace_api(
-                api_provider_config=provider_config,
-                http_method='POST',
-                service_endpoint='Photo/%s' % photoID if photoID else 'v1/Photo',
-                params={},
-                data=json.dumps(image),
-            )
-            if isinstance(resp, dict) and not resp.get('error_message'):
-                image.update({
-                    'PhotoID': resp.get('PhotoID')
-                })
-                product.marketplace_photo_id = resp.get('PhotoID')
-                photos.append(image)
-            time.sleep(1)
-
-        return photos
-    
-    
-    
-    
-    
-    
-    
-# Product Post Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _prepare_product_post_data(self, provider_config, product, create_on_kogan=False):
-        _logger.warning('kogan Product model %s, %i' %
-                     (product._name, product.id))
-        _logger.warning('kogan provider_config %s, %i' %
-                     (provider_config._name, provider_config.id))
-        currency = self.env['res.currency']
-        marketplace_brand = self.env['marketplace.product.brand']
-        currency_code = False
-        if product.currency_id:
-            currency_code = kogan_lookup.get_currency(
-                value=product.currency_id.name)
-        Photos = self._prepare_product_photo_post_data(
-            provider_config, product, product.marketplace_photo_id)
-        product_new_price = provider_config.pricelist_id.get_product_price_marketplace(
-            product) if provider_config.pricelist_id else None
-        taxes_id = product.taxes_id
-        if not taxes_id:
-            taxes_id = self.env['account.tax'].sudo().search([['id','=',2]])
-            product.taxes_id = [(4,taxes_id.id)]
-        res = taxes_id.compute_all(product_new_price or product.list_price)
-        photo_identifier = ','.join([photo['FileName'] for photo in Photos])
-        product.photo_identifier = photo_identifier
-        values = {
-            'Name': product.name or product.display_name,
-            'Code': product.default_code or '',
-            'Barcode': product.barcode or '',      
-            'Weight': float(product.weight * 1000),
-            'Length': float(product.length) * 10,
-            'Width' : float(product.width) * 10,
-            'Height' : float(product.height) * 10,
-            'Currency': currency_code,
-            'CostPrice':product.standard_price,
-            'Labels': product.display_name or '',
-            'EnableInventory': True,
-            'MinimumStockQuantity': 0,
-            'UnitOfMeasure': product.uom_name,
-            'SellPriceIncTax': round(res['total_included'],2),
-            'SellPriceExTax': round(res['total_excluded'],2),
-            'Brand': product.marketplace_brand_id.name,
-            'IsArchived': not product.active,
-            'IsBoM': False,
-            'IsBoMComponent': False,
-            'Photos': Photos,
-            'PhotoIdentifier': photo_identifier,
-            'OverrideSalesGLAccountCode': '200',
-            'OverrideSalesGLAccountName': 'Sales',
-            'OverridePurchaseGLAccountCode': '630',
-            'OverridePurchaseGLAccountName': 'Inventory',
-        }
-        
-        ConfigApp = product.mapped('marketplace_config_ids').filtered(
-            lambda config: config.config_id == provider_config)
-        ProductID = ConfigApp.ref_code if ConfigApp else False
-        
-        if not ProductID:
-            values.update({
-            'Description': """{}""".format( html2text.html2text(product.description_sale)[:2000] or ''),  
-            'InternalNotes':"""{}""".format( html2text.html2text(product.description_sale)[:2000] or ''),
-            'ExternalNotes': """{}""".format( html2text.html2text(product.description_sale)[:2000] or ''),
-            })
-
-        
-        qty = self.get_stock_qtys(product, provider_config)        
-        
-        if create_on_kogan:
-            values.update({
-                'QuantityInStock': qty,
-                'QuantityAvailableToSell': qty,
-                'QuantityAvailableToShip': qty,
-            })
-
-        return values
-    
-    
-    
-    
-# Stock Quantity >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def get_stock_qtys(self, product, provider_config):
-        qty = 0
-        if provider_config.location_ids:
-            for loc in provider_config.location_ids:
-                qty += sum(product.sudo().with_context({'location' : loc.id}).mapped('free_qty')) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
-        if isinstance(qty, (list,tuple)):
-            qty = qty[0]
-
-        return qty
-    
-    
-    
-    
-# Product Update Value >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _prepare_product_update_vals(self, provider_config, config_app, product, resp):
-        if config_app:
-            value = {
-                'category_ref_id': resp.get('ProductCategoryID'),
-                'ref_code': resp.get('ProductID'),
-            }
-            stock_qtys = self.get_stock_qtys(product, provider_config)
-            if product._name == 'product.template':
-                value.update(
-                    {'product_template_qty': stock_qtys})
-            else:
-                value.update({'product_qty': stock_qtys})
-            return config_app.write(value)
-        else:
-            return self.env['marketplace.product.template'].create({
-                'name': provider_config.api_provider,
-                'ref_code': resp.get('ProductID'),
-                'config_id': provider_config.id,
-                'product_template_id': product.id if product._name == 'product.template' else False,
-                'product_id': product.id if product._name == 'product.product' else product.product_variant_id.id,
-                'category_ref_id': resp.get('ProductCategoryID'),
-            })
-            
-            
-    
-    
-# Kogan listing rule >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _post_kogan_listing_rule(self, provider_config,  product, resp={}, config_app=False, params=None):
-        if product._name == 'marketplace.product.template':
-            product = product.product_template_id
-
-
-        for rule in product.kogan_listing_rule_ids.filtered(lambda r: r.ref_code and r.marketplace_product.ref_code):
-            
-            qty = self.get_stock_qtys(product, provider_config)
-            
-            buy_now_qty = rule.buy_now_max_qty if rule.buy_now_max_qty != 0 else qty
-            data = {
-                'KoganListingRuleID': rule.ref_code or None,
-                'ProductID': resp.get('ProductID') or rule.marketplace_product.ref_code,
-                'ProdcutCode': resp.get('Code') or product.default_code or None,
-                'RuleName': rule.name,
-                'Title': rule.title,
-                'SubTitle': rule.subtitle,
-                # 'ExternalKoganOrganisationName': rule.external_kogan_organisation_name,
-                'CategoryNumber': rule.category_number.marketplace_catg_ref_number,
-                'IsAutoListingEnabled': rule.is_auto_listing_enabled,
-                'AutoListingPriority': int(rule.auto_listing_priority),
-                'IsUseBuyNow': rule.is_use_buy_now_enabled,
-                'Photos': product.marketplace_photo_id or None,
-                'PhotoIdentifier': product.photo_identifier or None,
-                'BuyNowPrice': rule.buy_now_price,
-                "IsSellMultipleQty": bool(buy_now_qty),
-                "SellMultipleQuantity": buy_now_qty,
-                'StartPrice': round(rule.buy_now_price if rule.is_use_buy_now_enabled else rule.start_price, 2),
-                'IsListingNew': rule.is_listing_new,
-
-            }
-
-            resp = self.env['marketplace.connector']._synch_with_marketplace_api(
-                api_provider_config=provider_config,
-                http_method='POST',
-                service_endpoint='v1/KoganListingRule/%s' % rule.ref_code if rule.ref_code else 'v1/KoganListingRule/',
-                params=params or {},
-                data=json.dumps(data),
-            )
-
-            if isinstance(resp, dict) and not resp.get('error_message'):
-                rule.ref_code = resp.get('KoganListingRuleID')
-            
-            
-            
-            
-            
-# Temp Update self >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _temp_update_self(self, provider_config, ConfigApp, product, data, ProductID=None):
-        if ProductID:
-            data.update({'ProductID': ProductID})
-            if product._name == 'product.product':
-                if ConfigApp.product_qty > product.free_qty:
-                    self = self.with_context(
-                        reduce_stock_qty=ConfigApp.product_qty - product.free_qty)
-                else:
-                    self = self.with_context(
-                        increase_stock_qty=product.free_qty - ConfigApp.product_qty)
-                if product.free_qty != ConfigApp.product_qty:
-                    self._update_kogan_product_stock(
-                        provider_config, product, product.warehouse_id)
-            else:
-                if ConfigApp.product_template_qty > product.virtual_available:
-                    self = self.with_context(
-                        reduce_stock_qty=ConfigApp.product_template_qty - product.virtual_available)
-                else:
-                    self = self.with_context(
-                        increase_stock_qty=product.virtual_available - ConfigApp.product_template_qty)
-                if product.virtual_available != ConfigApp.product_template_qty:
-                    self._update_kogan_product_stock(
-                        provider_config, product, product.warehouse_id)
-            return self
-        return self
-
-
-
-
-# Post Kogan Product >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _post_kogan_product(self, provider_config, product, config_field, params=None):
-        ConfigApp = product.mapped('%s' % config_field).filtered(
-            lambda config: config.config_id == provider_config)
-        ProductID = ConfigApp.ref_code if ConfigApp else False
-        data = self._prepare_product_post_data(
-            provider_config, product, create_on_kogan=not bool(ProductID))
-
-        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
-            api_provider_config=provider_config,
-            http_method='POST',
-            service_endpoint='products/%s' % ProductID if ProductID else 'products/',
-            params=params or {},
-            data=json.dumps(data),
-        )
-
-        if isinstance(resp, dict) and not resp.get('error_message'):
-            self._prepare_product_update_vals(
-                provider_config, ConfigApp, product, resp)
-            self._update_kogan_product_stock(
-                provider_config, product, provider_config.location_ids)
-            self._post_kogan_listing_rule(
-                provider_config, product, resp, ConfigApp)
-
-        return resp
-
-
-
-
 
 
 # Prepare order update values >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1005,93 +1067,6 @@ class Kogan(models.AbstractModel):
             raise UserError(_("Error! %s" % resp.get('error_message')))
         rule.ref_code = False
         return True
-
-
-
-
-    # ============================================================
-    # UPDATE PRODUCT STOCK WHEN SALE ORDER CONFIRM DIRECT BY ODOO
-    # ============================================================
-
-    def _prepare_product_post_stock_data(self, ConfigApp, product, location_ids=False, sale_order=False, default_type=None):
-        inventory_entry = kogan_lookup.get_inventory_entry_type(
-            default_type)
-
-
-        if sale_order:
-            default_type = 36009
-            qty = 0 
-            for loc in location_ids:
-                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
-
-            inventory_adjustment_note = _(
-                'Odoo Increase/Reduce Stock Product Inventory due to sale order %s' % qty)
-                
-            
-        else:
-            default_type = 36009
-            qty = 0 
-            for loc in location_ids:
-                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
-            
-            inventory_adjustment_note = _(
-                'Odoo Increase/Reduce Stock Product Inventory %s' % qty)
-
-        if isinstance(qty, (list, tuple)):
-            qty = qty[0]
-
-        _logger.warning("Quantity Found of {} : {}; location_id {} quantity {}".format(product._name, product.id,location_ids.ids, qty))
-        
-        values = {
-            'ProductID': ConfigApp.ref_code,
-            'ProductCode': product.code if product._name == 'product.product' and product.code else None,
-            'InventoryType': default_type,
-            # 'QuantityChange': qty if sale_order else None,
-            'QuantityChange': None,
-            'ProductCostPrice': product.standard_price,
-            # 'QuantityInStockSnapshot': None if sale_order else qty,
-            'QuantityInStockSnapshot' : qty,
-            'Notes': sale_order.inventory_adjustment_note if sale_order and sale_order.inventory_adjustment_note else inventory_adjustment_note,
-            'WarehouseID': None,
-            'WarehouseCode': None,
-            'TransferFromWarehouseID': None,
-            'TransferFromWarehouseCode': None,
-            'TransferToWarehouseID': None,
-            'TransferToWarehouseCode': None,
-            'QueueInventorySummaryUpdates': None
-        }
-        return values
-
-
-
-
-
-# Update product Stock >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _update_kogan_product_stock(self, config, product, location_ids=False, sale_order=False, params=None):
-        ConfigApp = product.mapped('marketplace_config_ids').filtered(
-            lambda m_config: m_config.config_id == config and m_config.ref_code)
-        ProductID = ConfigApp.mapped("ref_code")[-1] if ConfigApp else False
-        _logger.warning("Updating stock of {} : {} ref {}".format(product._name, product.id, ProductID))
-        if ProductID:
-            data = self._prepare_product_post_stock_data(
-                ConfigApp, product, location_ids, sale_order)
-            data.update({'ProductID': ProductID})
-
-            _logger.warning("kogan ProductInventory MakeAdjustment body {}".format(json.dumps(data)))
-            resp = self.env['marketplace.connector']._synch_with_marketplace_api(
-                api_provider_config=config,
-                http_method='POST',
-                service_endpoint='ProductInventory/%s/MakeAdjustment' % ProductID,
-                params=params or {},
-                data=json.dumps(data),
-            )
-            if isinstance(resp, dict) and not resp.get('error_message'):
-                self._prepare_product_update_vals(
-                    config, ConfigApp, product, resp)
-            return resp
-        return {'error_message': _('Product ID is missing for kogan stock adjustment')}
-
-
 
 
 
