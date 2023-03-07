@@ -28,3 +28,7 @@ access_themarket_listing_rule_manager,access_themarket_listing_rule_manager,mode
 
 access_kogan_listing_rule,access_kogan_listing_rule,model_kogan_listing_rule,base.group_user,1,0,0,0
 access_kogan_listing_rule_manager,access_kogan_listing_rule_manager,model_kogan_listing_rule,base.group_system,1,1,1,1
+
+access_product_create_detail,access_product_create_detail,model_product_create_detail,sales_team.group_sale_salesman,1,0,0,0
+access_product_create_detail_manager,access_product_create_detail_manager,model_product_create_detail,sales_team.group_sale_salesman,1,1,1,1
+

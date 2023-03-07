@@ -17,14 +17,16 @@ MARKETPLACE_HOOK_FIELDS = {
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    description = fields.Char(string = "Product Description")
+    # description = fields.Char(string = "Product Description")
     marketplace_config_ids = fields.One2many('marketplace.product.template', 'product_template_id', string="Marketplace Application", copy=False)
     marketplace_brand_id = fields.Many2one('marketplace.product.brand', string='Trademe Brand', domain=[('config_id.api_provider', '=', 'tradevine')])
     
     kogan_brand_id = fields.Many2one('marketplace.product.brand', string='Kogan Brand', domain=[('config_id.api_provider', '=', 'kogan')])
     kogan_category_id = fields.Many2one('marketplace.product.category', string='Kogan Category',  domain=[('marketplace_config_id.api_provider', '=', 'kogan')])
     product_sku = fields.Char(string="Extra Product SKU")
+    kogan_facet_group = fields.Char('Facet Group', default="Clothing")
     # enabled = fields.Boolean()
+    product_template_attribute_value_id = fields.Many2many('product.product', relation='product_template_attribute_value_ids', string="Attribute Values", ondelete='restrict')
 
     themarket_brand_id = fields.Many2one('marketplace.product.brand', string='TheMarket Brand',  domain=[('config_id.api_provider', '=', 'themarket')])
     themarket_category_id = fields.Many2one('marketplace.product.category', string='TheMarket Category',  domain=[('marketplace_config_id.api_provider', '=', 'themarket')])
@@ -81,7 +83,7 @@ class ProductProduct(models.Model):
     marketplace_config_ids = fields.One2many('marketplace.product.template', 'product_id', string="Marketplace Application", copy=False)
     marketplace_inventory_adjustment_ids = fields.One2many('marketplace.inventory.adjustment.history', 'product_id', string="Inventory Adjustment History", copy=False)
     themarket_sku_ref = fields.Integer(string = "The Market SKU Ref ID",required=False)
-
+    
     def action_post_product_data_on_marketpalce(self):
         marketplace_config_ids = self.env['marketplace.config.details'].search([],limit=1)
         return {

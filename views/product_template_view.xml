@@ -26,9 +26,9 @@
             <!-- Kogan -->
             <xpath expr="//group[@name='themarket']" position="after">
                 <group name="kogan" string="Kogan">
-                    <field name="description"/>
-                    <field name="product_sku"/>                
-                    <field name="kogan_brand_id"/>
+                    <!-- <field name="description"/> -->
+                    <!-- <field name="product_sku"/>                 -->
+                    <field name="kogan_brand_id"/> 
                     <field name="kogan_category_id"/>
                 </group> 
             </xpath>

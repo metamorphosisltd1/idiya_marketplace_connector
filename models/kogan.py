@@ -167,71 +167,6 @@ class Kogan(models.AbstractModel):
 
 
     
-# Product for Odoo >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _load_kogan_product_for_odoo(self, provider_config, pageNumber=1, pageSize=50):
-        resp = self._get_kogan_product_by_paged_list(provider_config) or {}
-        for response in resp :
-            total_product = response.get('count')
-            load_product = 0
-            product_obj = self.env['product.product']
-            marketplace_product_obj = self.env['marketplace.product.template']
-            uom = self.env['uom.uom']
-            check_barcode_duplicate = []
-            while True:
-                product_values = []
-                if response and ((total_product - load_product) > 0):
-                    for product in response :
-                        ProductID = product.get('product_sku')
-                        domain = [
-                            ('marketplace_config_ids.ref_code', '=', ProductID)]
-                        if product.get('Barcode'):
-                            check_barcode_duplicate.append(product['Barcode'])
-                            domain = expression.OR(
-                                [domain, [('barcode', '=', product['Barcode'])]])
-                        if not product_obj.search(domain, limit=1):
-                            vals = self._prepare_product_values(product, provider_config)
-                            if vals.get('barcode') in check_barcode_duplicate or not product.get('Barcode'):
-                                vals.pop('barcode')
-
-                            marketplace_order = marketplace_product_obj.search(
-                                [('ref_code', '=', ProductID)], limit=1)
-                            if vals:
-                                if product.get('UnitOfMeasure'):
-                                    uom = uom.search(
-                                        [('name', '=', product['UnitOfMeasure'])], limit=1)
-                                    if uom:
-                                        vals.update({'uom_id': uom.id})
-                                if not marketplace_order:
-                                    vals.update({
-                                        'marketplace_config_ids': [(0, 0, {
-                                            'name': provider_config.name,
-                                            'config_id': provider_config.id,
-                                            'category_ref_id': product.get('ProductCategoryID'),
-                                            'ref_code': ProductID,
-                                        })]
-                                    })
-                                else:
-                                    vals.update({'marketplace_config_ids': [
-                                                (4, marketplace_order.id)]})
-
-                                product_values.append(vals)
-                    if product_values:
-                        product_obj.create(product_values)
-                        product_obj.env.cr.commit()
-
-                    load_product += len(response)
-                    if load_product != total_product:
-                        # pageNumber += 1
-                        response = self._get_kogan_product_by_paged_list(
-                            provider_config, pageNumber, pageSize) or {}
-                else:
-                    break
-            return response
-
-
-
-
-
 
 
 
@@ -248,14 +183,13 @@ class Kogan(models.AbstractModel):
                            ########### PUSH PRODUCT >>>>>>>>>>
 
 # Update product Stock >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _update_kogan_product_stock(self, config, product, location_ids=False, sale_order=False, params=None):
+    def _update_kogan_product_stock(self, ConfigApp, config, product, location_ids=False, sale_order=False):
         ConfigApp = product.mapped('marketplace_config_ids').filtered(
             lambda m_config: m_config.config_id == config and m_config.ref_code)
         ProductID = ConfigApp.mapped("ref_code")[-1] if ConfigApp else False
         _logger.warning("Updating stock of {} : {} ref {}".format(product.name, product.id, ProductID))
         if ProductID:
-            data = self._prepare_product_post_stock_data(
-                ConfigApp, product, location_ids, sale_order)
+            data = self._prepare_product_post_stock_data(product)
             data.update({'ProductID': ProductID})
 
             _logger.warning("kogan ProductInventory MakeAdjustment body {}".format(json.dumps(data)))
@@ -263,55 +197,25 @@ class Kogan(models.AbstractModel):
                 api_provider_config=config,
                 http_method='POST',
                 service_endpoint='products/stockprice',
-                params=params or {},
                 data=json.dumps(data),
             )
             if isinstance(resp, dict) and not resp.get('error_message'):
-                self._prepare_product_update_vals(
-                    config, ConfigApp, product, resp)
+                self._prepare_product_update_vals(config, product, resp)
             return resp
         return {'error_message': _('Product ID is missing for kogan stock adjustment')}
     
-    
-    
-    
-    def _prepare_product_post_stock_data(self, ConfigApp, product, location_ids=False, sale_order=False, default_type=None):
-        if sale_order:
-            default_type = 36009
-            qty = 0 
-            for loc in location_ids:
-                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
 
-            inventory_adjustment_note = _(
-                'Odoo Increase/Reduce Stock Product Inventory due to sale order %s' % qty)
-                
-        else:
-            default_type = 36009
-            qty = 0 
-            for loc in location_ids:
-                qty += sum(product.with_context({"location" : loc.id}).mapped("free_qty")) if product._name == 'product.product' else sum(product.product_variant_id.sudo().with_context({'location' : loc.id}).mapped('free_qty'))
-            
-            inventory_adjustment_note = _(
-                'Odoo Increase/Reduce Stock Product Inventory %s' % qty)
-
-        if isinstance(qty, (list, tuple)):
-            qty = qty[0]
-        _logger.warning("Quantity Found of {} : {}; location_id {} quantity {}".format(product._name, product.id,location_ids.ids, qty))
+    
+    
+    def _prepare_product_post_stock_data(self, product, location_ids=False, sale_order=False, default_type=None):
+        
         values = {
-            'ProductID': ConfigApp.ref_code,
-            'ProductCode': product.code if product._name == 'product.product' and product.code else None,
-            'InventoryType': default_type,
-            'QuantityChange': None,
-            'ProductCostPrice': product.list_price,
-            'QuantityInStockSnapshot' : qty,
-            'Notes': sale_order.inventory_adjustment_note if sale_order and sale_order.inventory_adjustment_note else inventory_adjustment_note,
-            'WarehouseID': None,
-            'WarehouseCode': None,
-            'TransferFromWarehouseID': None,
-            'TransferFromWarehouseCode': None,
-            'TransferToWarehouseID': None,
-            'TransferToWarehouseCode': None,
-            'QueueInventorySummaryUpdates': None
+            'product_sku': product.default_code if product.default_code else product.product_sku,
+            "offer_data" : {
+                                    "NZD": {"price":product.list_price,
+                                            "handling_days": 0}},
+            'stock' : product.qty_available,
+            'enabled': product.is_published
         }
         return values
 
@@ -322,7 +226,7 @@ class Kogan(models.AbstractModel):
 
 
 # Product Async Task >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _get_product_async_task(self, provider_config, product, resp, data):
+    def _get_product_async_task(self, ConfigApp, provider_config, product, resp, data):
         if resp.get('pending_url'):
             task_url = resp.get('pending_url')
             task_id = task_url.split("/")[-2]
@@ -334,111 +238,133 @@ class Kogan(models.AbstractModel):
             )
 
             if isinstance(asnc_task, dict) and (asnc_task.get('status') == "CompleteWithErrors"):
+                # self.env['product.create.detail'].write({"status":"complete_with_error"})
+                # self.env.cr.commit()
                 raise UserError("{}".format(json.dumps(asnc_task.get("body").get("errors"))))
             else:
-                self._prepare_product_update_vals(
-                provider_config, product, data)
+                self._prepare_product_update_vals(provider_config, product, data)
+                # self.env['product.create.detail'].write({"status":"complete"})
+                # self.env.cr.commit()
                 raise UserError("Product pushed to Kogan Successfully ...")
             
-
+    
 # Product Update Value to Marketplace Product Template >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _prepare_product_update_vals(self, provider_config, products, data):
         for product in products :
-            product_template = self.env['marketplace.product.template'].create({
-                'name': provider_config.api_provider,
-                'ref_code': data['product_sku'],
-                'config_id': provider_config.id,
-                'product_template_id': product.id if product._name == 'product.template' else False,
-                'product_id': product.id if product._name == 'product.product' else product.product_variant_id.id,
-                'category_ref_id': product.kogan_category_id.marketplace_catg_ref_number,
-                'product_qty' : data['stock']
-            })
-            self.env.cr.commit()
+            for datas in data:
+                product_template = self.env['marketplace.product.template'].create({
+                    'name': provider_config.api_provider,
+                    'ref_code': datas['product_sku'],
+                    'config_id': provider_config.id,
+                    'product_template_id': product.id if product._name == 'product.template' else False,
+                    'product_id': product.id if product._name == 'product.product' else product.product_variant_id.id,
+                    'category_ref_id': product.kogan_category_id.marketplace_catg_ref_number,
+                    'product_qty' : datas['stock']
+                })
+                self.env.cr.commit()
+        
+            
+# Prepare product details during creation in KOGAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _prepare_product_create_details(self, provider_config, resp, data):
+        product_detail = self.env['product.create.detail'].create({
+            'name': provider_config.api_provider,
+            'config_id': provider_config.id,
+            'kogan_async_link': resp.get("pending_url"),
+            'request_data': json.dumps(data)
+        })
+        self.env.cr.commit()
 
 
 
 # Product Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    def _prepare_product_post_data(self, provider_config, products):
+    def _prepare_product_post_data(self, products):
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         products_list = []
-        variant_base = {}
         for product in products:
-            taxes_id = product.taxes_id
-            if not taxes_id:
-                taxes_id = self.env['account.tax'].sudo().search([['id','=',2]])
-                product.taxes_id = [(4,taxes_id.id)]
-            
-            images = []
-            if product._get_images():
-                for image in product._get_images():
-                    image_url = "{}/web/image?model={}&field=image_1920&id={}".format(base_url,image._name,image.id)
-                    images.append(image_url)
-            
-            facet_list = []
-            if product.attribute_line_ids:
-                for line in product.attribute_line_ids:
-                    items = []
-                    for item in line.value_ids:
-                        items.append({
-                            "type" : line.attribute_id.name,
-                            "value" : item.name
-                            })
-                        
-                    facet_list.append({
-                        "group" : "{} {}".format(product.name,line.attribute_id.name),
-                        "items" : items
-                    })
-
-                    variant_base_01 = {"group_title": "{} variation".format(product.name),
-                                    "group_id": "{} id".format(product.name)}
-                    variant_base.update(variant_base_01)
-                    for i, f in enumerate(facet_list):
-                        vary_on_values = {
-                            "group" : f["group"],
-                            "type" : f["items"][0]["type"]
-                        }
-                        vary_on_keys = "vary_on" if i == 0 else "vary_on_{}".format(i+1)
-                        vary_on_dict = {vary_on_keys:vary_on_values}
-                        variant_base.update(vary_on_dict)
-
-                products_list.append({
-                    'product_sku': product.default_code if product.default_code else product.product_sku,
-                    'product_title': product.name or product.display_name,
-                    'product_description' : product.description,
-                    'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
-                    'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
-                    # 'images' : images,
-                    'stock' : product.qty_available,
-                    "offer_data" : {
-                                    "NZD": {"price":product.list_price,
-                                            "handling_days": 0}},
-                    "product_dimensions" : {
-                                            "Weight":product.weight,
-                                            "Volume" : product.volume },
-                    'enabled': product.is_published,
-                    'brand': product.kogan_brand_id.name,   
-                    "facets" : facet_list,
-                    "variant": variant_base or {}
-                })
+            if product.is_published == True:
+                taxes_id = product.taxes_id
+                if not taxes_id:
+                    taxes_id = self.env['account.tax'].sudo().search([['id','=',2]])
+                    product.taxes_id = [(4,taxes_id.id)]
                 
-            else :
-                products_list.append({
-                    'product_sku': product.default_code if product.default_code else product.product_sku,
-                    'product_title': product.name or product.display_name,
-                    'product_description' : product.description,
-                    'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
-                    'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
-                    # 'images' : images,
-                    'stock' : product.qty_available,
-                    "offer_data" : {
-                                    "NZD": {"price":product.list_price,
-                                            "handling_days": 0}},
-                    "product_dimensions" : {
-                                            "Weight":product.weight,
-                                            "Volume" : product.volume },
-                    'enabled': product.is_published,
-                    'brand': product.kogan_brand_id.name
-                })
+                images = []
+                if product._get_images():
+                    for image in product._get_images():
+                        image_url = "{}/web/image?model={}&field=image_1920&id={}".format(base_url,image._name,image.id)
+                        images.append(image_url)
+            
+                variant_data = {"group_title": "{}".format(product.kogan_facet_group),
+                                "group_id": "{}_id".format(product.kogan_facet_group),}
+                
+                attributes= product.product_variant_ids.mapped('product_template_attribute_value_ids').mapped('attribute_id')
+                v_count=0
+                for att in attributes:
+                    length= "_{}".format(v_count+1) if v_count > 0 else ''
+                    variant_data.update({
+                                    "vary_on{}".format(length) : {
+                                                "group" : product.kogan_facet_group,
+                                                "type" : att.name
+                                            }
+                                })
+                    v_count+=1
+                
+                
+                if product.product_variant_ids:
+                    for variant in product.product_variant_ids:
+                        prod_sku = variant.default_code
+                        products_list.append({
+                            'product_sku': prod_sku,
+                            'product_title' : variant.name,
+                            'product_description' : product.website_description,
+                            'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
+                            'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
+                            # 'images' : images,
+                            'stock' : product.qty_available,
+                            # 'stock' : product.avail_instock_qty,
+                            "offer_data" : {
+                                            "NZD": {"price":product.list_price,
+                                                    "handling_days": 0}},
+                            "product_dimensions" : {
+                                                    "Weight":product.weight,
+                                                    "Volume" : product.volume },
+                            'enabled': product.is_published,
+                            'brand': product.kogan_brand_id.name,
+                            "facets" : [
+                                {
+                                    "group": product.kogan_facet_group,
+                                    "items": [
+                                        {
+                                            "type": att_val.attribute_id.name,
+                                            "value": att_val.name
+                                        }for att_val in variant.product_template_attribute_value_ids]
+                                }
+                                ],
+                            "variant": variant_data
+                        })
+
+                        
+                else :
+                    product_list = {
+                        'product_sku': product.default_code if product.default_code else product.product_sku,
+                        'product_title': product.name or product.display_name,
+                        'product_description' : product.website_description,
+                        'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
+                        'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
+                        # 'images' : images,
+                        'stock' : product.qty_available,
+                        # 'stock' : product.avail_instock_qty,
+                        "offer_data" : {
+                                        "NZD": {"price":product.list_price,
+                                                "handling_days": 0}},
+                        "product_dimensions" : {
+                                                "Weight":product.weight,
+                                                "Volume" : product.volume },
+                        'enabled': product.is_published,
+                        'brand': product.kogan_brand_id.name  
+                        }
+                    products_list.append(product_list)
+            else:
+                raise UserError("%s is not Published." % product.name)
                 
         # raise UserError("{}".format(json.dumps(products_list)))
         return products_list
@@ -447,8 +373,10 @@ class Kogan(models.AbstractModel):
                 
 # Post Kogan Product >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _post_kogan_product(self, provider_config, product, config_field):
-        data = self._prepare_product_post_data(
-            provider_config, product)
+        ConfigApp = product.mapped('%s' % config_field).filtered(
+            lambda config: config.config_id == provider_config)
+        ProductID = ConfigApp.ref_code if ConfigApp else False
+        data = self._prepare_product_post_data(product)
 
         resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
@@ -456,10 +384,9 @@ class Kogan(models.AbstractModel):
             service_endpoint='products/',
             data=json.dumps(data)
         )
-
+        self._prepare_product_create_details(provider_config, resp, data)
         if isinstance(resp, dict) and (resp.get('status') != "Failed"):
-            self._get_product_async_task(
-                provider_config, product, resp, data)
+            self._get_product_async_task(ConfigApp, provider_config, product, resp, data)
         else:
             raise UserError("{}".format(json.dumps(resp.get("error"))))
         return resp
@@ -512,49 +439,132 @@ class Kogan(models.AbstractModel):
 
 
 
+                            ############# KOGAN ORDER ##################
 
 
-
-
+# Get All Open Order >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _get_status_for_order(self):
-        pass
+        statuses = ["ReleasedForShipment", "Pending", "AcknowledgedBySeller", "PartiallyShipped", "Shipped", "Canceled"]
+        
 
     def _get_all_open_order(self, provider_config, params):
         params = {
             'status': self._get_status_for_order(),
         }
-        return self.env['marketplace.connector']._synch_with_marketplace_api(
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
-            service_endpoint='orders',
+            service_endpoint='orders/?status=%s' % params.get("status"),
             params=params,
-            data={},
         )
         
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            pass
         
         
+        
+        
+        
+        
+# Get Order By ID >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     def _get_kogan_order_ref(self):
         pass
+        # try:
+        #     raise UserError("Please enter a value for 'input':")
+        # except UserError as e:
+        #     input_value = input(str(e.args[0]) + "\n")
+    
     
     def _get_order_by_id(self, provider_config, params):
         params = {
             "kogan_order_ref" : self._get_kogan_order_ref()
         }
-        return self.env['marketplace.connector']._synch_with_marketplace_api(
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
             api_provider_config=provider_config,
             http_method='GET',
-            service_endpoint='orders',
+            service_endpoint='orders/:%s' % params.get("kogan_order_ref"),
             params=params,
             data={},
         )
+        
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            pass
 
 
 
 
+# Prepare Product Dispatch Order >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _prepare_product_dispatch_data(self):
+        data = [{
+                    "ID": "proident eu adipisicing laboris",
+                    "Items": [
+                        {
+                        "OrderItemID": "102025",
+                        "SellerSku": "Excepteur et",
+                        "Quantity": 5,
+                        "ShippedDateUtc": "2010-06-29T12:21:28.422Z",
+                        "TrackingNumber": "ad",
+                        "ShippingCarrier": "sint consectetur proident cillum"
+                        }
+                    ]
+                }
+                ]
+        return data
+    
+    
+    def _post_order_dispatch_information(self, provider_config):
+        
+        data = self._prepare_product_dispatch_data()
+        
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='POST',
+            service_endpoint='orders/fulfill',
+            data=json.dumps(data),
+        )
+        
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            pass
+        
+        
+        
+        
+# Post Order Cancel Request >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _post_order_cancel_request(self, provider_config, params):
+        params = {
+            "kogan_order_ref" : self._get_kogan_order_ref()
+        }
+        data = self._prepare_product_dispatch_data()
+        
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='POST',
+            service_endpoint='orders/%s/cancel' % params.get("kogan_order_ref"),
+            data=json.dumps(data),
+        )
+
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            pass
 
 
 
 
+# Post Order Refund Request >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    def _post_order_refund_request(self, provider_config, params):
+        params = {
+            "kogan_order_ref" : self._get_kogan_order_ref()
+        }
+        data = self._prepare_product_dispatch_data()
+        
+        resp = self.env['marketplace.connector']._synch_with_marketplace_api(
+            api_provider_config=provider_config,
+            http_method='POST',
+            service_endpoint='orders/%s/refund' % params.get("kogan_order_ref"),
+            data=json.dumps(data),
+        )
+
+        if isinstance(resp, dict) and (resp.get('status') != "Failed"):
+            pass
 
 
 

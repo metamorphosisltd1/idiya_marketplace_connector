@@ -55,6 +55,20 @@
                                 </tree>
                             </field>
                         </page>
+
+
+                        <page string="Upload Details" name="kogan_upload_details">
+                            <field name="kogan_upload_details" readonly="1" nolabel="1" force_save="1">
+                                <tree editable="top">
+                                    <field name="kogan_async_link" force_save="1"/>
+                                    <field name="request_data" force_save="1"/>
+                                    <field name="checked"/>
+                                    <field name="status"/>
+                                </tree>
+                            </field>
+                        </page>
+
+
                         <page string="Sale Order" name="sale_order_ids">
                             <field name="sale_order_ids" readonly="1" nolabel="1" force_save="1">
                                 <tree editable="top">

@@ -40,7 +40,7 @@ class MarketPlaceProductTemplate(models.Model):
     _inherit = 'marketplace.marketplace'
     _description = 'Marketplace Product Template'
     _rec_name = 'product_id'
-
+    
     product_template_id = fields.Many2one('product.template', ondelete='cascade')
     product_id = fields.Many2one('product.product', ondelete='cascade')
     category_ref_id = fields.Char(copy=False)
@@ -54,7 +54,19 @@ class MarketPlaceProductTemplate(models.Model):
     @api.onchange('product_template_id')
     def _onchange_product_template_id(self):
         self.name = self.product_template_id.name
-
+        
+        
+        
+class ProductCreationDetails(models.Model):
+    _name = 'product.create.detail'
+    _description = 'Marketplace Product Creation Details'
+    
+    name = fields.Char()
+    config_id = fields.Many2one('marketplace.config.details', string='Marketplace Application', ondelete='cascade')
+    kogan_async_link = fields.Char(string="Kogan Pending URL")
+    request_data = fields.Char(string="JSON Data")
+    checked = fields.Boolean(String="Checked")
+    status = fields.Selection([('draft', 'Draft'), ('complete', 'Complete'), ('failed', 'Failed'), ('complete_with_error', 'Complete with Error')])
 
 
 
@@ -286,6 +298,7 @@ class KoganListingRule(models.Model):
 
     def _compute_subtitle(self):
         if not self.subtitle:
+            # pass    
             if self.product_template_id.kogan_brand_id:
                 self.subtitle = "Original " + self.product_template_id.kogan_brand_id.name + " Brand Product"
             else:

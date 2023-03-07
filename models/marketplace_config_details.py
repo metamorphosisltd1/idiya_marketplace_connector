@@ -55,6 +55,9 @@ class MarketPlaceConfigDetails(models.Model):
     team_id = fields.Many2one('crm.team', string='Sales Team', required=True)
     pricelist_id = fields.Many2one('product.pricelist', 'Pricelist')
     product_template_ids = fields.One2many('marketplace.product.template', 'config_id', string="Products")
+    
+    kogan_upload_details = fields.One2many('product.create.detail', 'config_id', string="Details")
+
     sale_order_ids = fields.One2many('marketplace.order', 'config_id', string="Sale Order")
     label = fields.Char(compute="_compute_label_for_sync_data")
     tz = fields.Selection(_tz_get, string='Timezone', readonly=False, default=lambda config: config.env.user.tz)  
@@ -126,7 +129,7 @@ class MarketPlaceConfigDetails(models.Model):
                     msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('HitsTotal'), self.api_provider))
                 raise UserError(msg)
             _logger.info('{}'.format(msg))
-            raise UserError(response.get('detail'))
+            # raise UserError(response.get('detail'))
         
 
 

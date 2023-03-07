@@ -19,10 +19,9 @@ class MarketplaceConfigWizard(models.TransientModel):
         for config in self.marketplace_config_ids:
             api_provider_name = config.api_provider
             api_provider_obj = self.env['%s' % api_provider_name]
-            
             if api_provider_name=="kogan":
-                if len(records) > 500:
-                    raise UserError(_("Can't push more than 500 Products."))
+                if len(records) > 100:
+                    raise UserError(_("Can't push more than 100 Products."))
                 else:
                     if hasattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method)):
                         response = getattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method))(config, records, config_field)
@@ -32,7 +31,6 @@ class MarketplaceConfigWizard(models.TransientModel):
                         else:
                             _logger.info('{}'.format(msg))
                         
-
             else:
                 if hasattr(api_provider_obj, '_post_%s_%s' % (api_provider_name, method)):
                     for record in records:
