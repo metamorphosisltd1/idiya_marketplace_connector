@@ -3,9 +3,8 @@ import json
 import time
 import requests
 import dateutil.parser
-import html2text
-import pytz
 import base64
+import pytz
 from datetime import datetime, timedelta
 from werkzeug.urls import url_quote
 from odoo.exceptions import UserError
@@ -292,8 +291,8 @@ class Kogan(models.AbstractModel):
                         image_url = "{}/web/image?model={}&field=image_1920&id={}".format(base_url,image._name,image.id)
                         images.append(image_url)
             
-                variant_data = {"group_title": "{}_{}".format(product.x_studio_sku,product.kogan_facet_group),
-                                "group_id": "{}_{}_id".format(product.x_studio_sku,product.kogan_facet_group),}
+                variant_data = {"group_title": "{}_{}".format(product.name,product.kogan_facet_group),
+                                "group_id": "{}_{}_id".format(product.name,product.kogan_facet_group),}
                 
                 # attributes= product.product_variant_ids.mapped('product_template_attribute_value_ids').mapped('attribute_id')
                 # v_count=0
@@ -308,9 +307,11 @@ class Kogan(models.AbstractModel):
                 #     v_count+=1
                 
                 
-                if product.product_variant_ids:
+                # if product.product_variant_ids:
+                if product.product_variant_count > 1 :
                     for variant in product.product_variant_ids:
                         prod_sku = variant.default_code
+                        
                         facet = [{
                                     "group": product.kogan_facet_group,
                                     "items": [
@@ -319,6 +320,12 @@ class Kogan(models.AbstractModel):
                                             "value": att_val.name
                                         }for att_val in variant.product_template_attribute_value_ids]
                                     }]
+                        
+                        # variant_image = variant.product_variant_image_ids
+                        # if variant_image :
+                        #     for images in variant_image:
+                        #         image_new = base64.b64encode(images).decode('utf-8')
+                        image_new = variant.product_variant_image_ids.name
                         
                         v_count=0
                         for item in facet[0]["items"]:
@@ -334,58 +341,50 @@ class Kogan(models.AbstractModel):
                         products_list.append({
                             'product_sku': prod_sku,
                             'product_title' : variant.name,
-                            'product_description' : product.website_description,
+                            # 'product_description' : product.website_description,
                             'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
-                            # 'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
-                            'images' : images,
-                            # 'stock' : product.qty_available,
-                            'stock' : product.avail_instock_qty,
+                            'images' : image_new,
+                            # 'stock' : product.avail_instock_qty,
                             "offer_data" : {
                                             "NZD": {"price":product.list_price,
                                                     "handling_days": 0}},
-                            "product_dimensions" : {
-                                                    "Weight":product.weight,
-                                                    "Volume" : product.volume },
+                            # "product_dimensions" : {
+                            #                     "length": product.length if product.length else "",
+                            #                     "width" : product.width if product.width else "",
+                            #                     "height" : product.height if product.height else "",
+                            #                     "weight" : product.weight if product.weight else ""
+                            #                     },
+                            "product_gtin" : product.barcode if product.barcode else "",
                             'enabled': product.is_published,
                             'brand': product.kogan_brand_id.name,
                             "facets" : facet,
-                            # "facets" : [
-                            #         {
-                            #         "group": product.kogan_facet_group,
-                            #         "items": [
-                            #             {
-                            #                 "type": att_val.attribute_id.name,
-                            #                 "value": att_val.name
-                            #             }for att_val in variant.product_template_attribute_value_ids]
-                            #         }
-                            #         ],
-                            
                             "variant": variant_data
                         })
                 else :
-                    product_list = {
+                    products_list.append({
                         'product_sku': product.default_code if product.default_code else product.product_sku,
                         'product_title': product.name or product.display_name,
                         'product_description' : product.website_description,
                         'category' : "kogan:{}".format(product.kogan_category_id.marketplace_catg_ref_number),
-                        # 'images' : ["https://idiya.co.nz/web/static/prod/112.04.272.jpg"],
                         'images' : images,
-                        # 'stock' : product.qty_available,
                         'stock' : product.avail_instock_qty,
                         "offer_data" : {
                                         "NZD": {"price":product.list_price,
                                                 "handling_days": 0}},
                         "product_dimensions" : {
-                                                "Weight":product.weight,
-                                                "Volume" : product.volume },
+                                                "length": product.length if product.length else "",
+                                                "width" : product.width if product.width else "",
+                                                "height" : product.height if product.height else "",
+                                                "weight" : product.weight if product.weight else ""
+                                                },
+                        "product_gtin" : product.barcode if product.barcode else "",
                         'enabled': product.is_published,
                         'brand': product.kogan_brand_id.name  
-                        }
-                    products_list.append(product_list)
+                        })
             else:
                 raise UserError("%s is not Published." % product.name)
         
-        # raise UserError("{}".format(json.dumps(products_list)))
+        raise UserError("{}".format(json.dumps(products_list)))
         return products_list
     
         

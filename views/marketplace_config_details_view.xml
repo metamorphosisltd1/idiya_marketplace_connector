@@ -26,6 +26,11 @@
                             <field name="seller_token"/>
                             <field name="seller_id"/>                           
                         </group>
+
+
+                        <group id="onceit_api_details" attrs="{'invisible': [('api_provider', '!=', 'onceit')]}">
+                            <field name="shop_key"/>
+                        </group>
                         
                         <group id="tradevine_api_details" attrs="{'invisible': [('api_provider', '!=', 'tradevine')]}">
                             <field name="consumer_key"/>

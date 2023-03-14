@@ -23,7 +23,6 @@ TASK ID - 2711537
         'security/ir.model.access.csv',
         'views/marketplace_config_details_view.xml',
         'views/marketplace_product_category_view.xml',
-        # 'views/marketplace_product_template_view.xml',
         'views/product_template_view.xml',
         'views/sale_order_view.xml',
         'views/marketplace_product_brand_view.xml',

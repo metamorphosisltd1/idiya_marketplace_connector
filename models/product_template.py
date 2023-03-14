@@ -21,11 +21,15 @@ class ProductTemplate(models.Model):
     marketplace_config_ids = fields.One2many('marketplace.product.template', 'product_template_id', string="Marketplace Application", copy=False)
     marketplace_brand_id = fields.Many2one('marketplace.product.brand', string='Trademe Brand', domain=[('config_id.api_provider', '=', 'tradevine')])
     
+    #Kogan
     kogan_brand_id = fields.Many2one('marketplace.product.brand', string='Kogan Brand', domain=[('config_id.api_provider', '=', 'kogan')])
     kogan_category_id = fields.Many2one('marketplace.product.category', string='Kogan Category',  domain=[('marketplace_config_id.api_provider', '=', 'kogan')])
     product_sku = fields.Char(string="Extra Product SKU")
     kogan_facet_group = fields.Char('Facet Group', default="Clothing")
-    # enabled = fields.Boolean()
+    
+    #Onceit
+    onceit_category_id = fields.Many2one('marketplace.product.category', string='Onceit Category',  domain=[('marketplace_config_id.api_provider', '=', 'onceit')])
+    
     product_template_attribute_value_id = fields.Many2many('product.product', relation='product_template_attribute_value_ids', string="Attribute Values", ondelete='restrict')
 
     themarket_brand_id = fields.Many2one('marketplace.product.brand', string='TheMarket Brand',  domain=[('config_id.api_provider', '=', 'themarket')])

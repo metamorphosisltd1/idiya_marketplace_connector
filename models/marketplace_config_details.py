@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 
 API_PROVIDER_END_POINT_URL = {
     'kogan' : 'https://nimda-marketplace.aws.kgn.io/api/marketplace/v2', #Kogan
+    'onceit' : 'https://onceitnz-dev.mirakl.net', #Onceit
     'tradevine' : 'https://api.tradevine.com',
     'themarket' : 'https://portal.themarket.com'
 }
@@ -23,6 +24,7 @@ class MarketPlaceConfigDetails(models.Model):
     def _get_api_provider(self):
         return [
             ('kogan', 'Kogan'),
+            ('onceit', 'Onceit'),
             ('tradevine', 'Tradevine'),
             ('themarket', 'TheMarket')
             ]
@@ -31,6 +33,10 @@ class MarketPlaceConfigDetails(models.Model):
     #Kogan
     seller_token = fields.Char(required_if_api_provider='kogan', copy=False)
     seller_id = fields.Char(required_if_api_provider='kogan', copy=False)
+    kogan_upload_details = fields.One2many('product.create.detail', 'config_id', string="Details")
+    
+    #Onceit
+    shop_key = fields.Char(required_if_api_provider='onceit', copy=False)
     
     #Tradevine
     consumer_key = fields.Char(required_if_api_provider='tradevine', copy=False)
@@ -38,6 +44,7 @@ class MarketPlaceConfigDetails(models.Model):
     access_token_key = fields.Char(required_if_api_provider='tradevine', copy=False)
     access_token_secret = fields.Char(required_if_api_provider='tradevine', copy=False)
     external_trade_me_organisation_name = fields.Char(required_if_api_provider='tradevine', help='Organization name of the marketplace account')
+    
     # TheMarket
     themarket_username = fields.Char(string="Username",required_if_api_provider='themarket', copy=False)
     themarket_password = fields.Char(string="Password",required_if_api_provider='themarket', copy=False)
@@ -56,8 +63,6 @@ class MarketPlaceConfigDetails(models.Model):
     pricelist_id = fields.Many2one('product.pricelist', 'Pricelist')
     product_template_ids = fields.One2many('marketplace.product.template', 'config_id', string="Products")
     
-    kogan_upload_details = fields.One2many('product.create.detail', 'config_id', string="Details")
-
     sale_order_ids = fields.One2many('marketplace.order', 'config_id', string="Sale Order")
     label = fields.Char(compute="_compute_label_for_sync_data")
     tz = fields.Selection(_tz_get, string='Timezone', readonly=False, default=lambda config: config.env.user.tz)  
@@ -101,6 +106,9 @@ class MarketPlaceConfigDetails(models.Model):
                     api_provider_obj._load_kogan_category_for_odoo(config) #Kogan
                     api_provider_obj._load_kogan_brand_for_odoo(config)
                     
+                elif config.api_provider == "onceit":
+                    api_provider_obj._load_onceit_category_for_odoo(config) #Onceit
+                    
                 elif config.api_provider == "themarket":
                     api_provider_obj._load_themarket_category_for_odoo(config)
                     api_provider_obj._load_themarket_brands_for_odoo(config)
@@ -111,26 +119,35 @@ class MarketPlaceConfigDetails(models.Model):
 
     def action_test_connection(self):
         api_provider_obj = self.env['%s' % self.api_provider]
-        if hasattr(api_provider_obj, '_get_%s_product' % self.api_provider):
-            # this call for only check test connection
-            response = getattr(api_provider_obj, '_get_%s_product' % self.api_provider)(self)
-            msg = _('Test call succeeded!')
-            if isinstance(response, dict) and not response.get('error_message'):
-                if self.api_provider == 'tradevine':
-                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('TotalCount'), self.api_provider))
+                
+        # if hasattr(api_provider_obj, '_get_%s_product' % self.api_provider):
+        #     # this call for only check test connection
+        #     response = getattr(api_provider_obj, '_get_%s_product' % self.api_provider)(self)
+        #     msg = _('Test call succeeded!')
+        #     if isinstance(response, dict) and not response.get('error_message'):
+        #         if self.api_provider == 'tradevine':
+        #             msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('TotalCount'), self.api_provider))
                     
-                elif self.api_provider == 'kogan': #Kogan
-                    api_provider_obj._load_kogan_category_for_odoo(self) #Kogan
-                    api_provider_obj._load_kogan_brand_for_odoo(self)
-                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('body').get('count'), self.api_provider))
+        #         elif self.api_provider == 'kogan': #Kogan
+        #             api_provider_obj._load_kogan_category_for_odoo(self) #Kogan
+        #             api_provider_obj._load_kogan_brand_for_odoo(self)
+        #             msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('body').get('count'), self.api_provider))
          
-                elif self.api_provider == 'themarket':
-                    api_provider_obj._load_themarket_brands_for_odoo(self)
-                    msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('HitsTotal'), self.api_provider))
-                raise UserError(msg)
-            _logger.info('{}'.format(msg))
-            # raise UserError(response.get('detail'))
+        #         elif self.api_provider == 'themarket':
+        #             api_provider_obj._load_themarket_brands_for_odoo(self)
+        #             msg = _('Test call succeeded: You have %s products in your %s account!' % (response.get('HitsTotal'), self.api_provider))
+        #         raise UserError(msg)
+        #     _logger.info('{}'.format(msg))
+        #     raise UserError(response[0])
         
+        # Onceit Test ........................................................................
+        if hasattr(api_provider_obj,'_load_%s_category_for_odoo'%self.api_provider):
+            onceit_resp = getattr(api_provider_obj,'_load_%s_category_for_odoo'%self.api_provider)(self)
+            if isinstance(onceit_resp, dict):
+                if self.api_provider == 'kogan':
+                    raise UserError("Successfully Connected to Kogan")
+                elif self.api_provider == 'onceit':
+                    raise UserError("Successfully connected to Onceit...")
 
 
     def action_get_product(self):
@@ -142,6 +159,8 @@ class MarketPlaceConfigDetails(models.Model):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('TotalCount'), self.api_provider))
                 elif self.api_provider == 'kogan':
+                    msg = _('Successfully Imported %s products from your %s account!' % (response.get('body').get('count'), self.api_provider))
+                elif self.api_provider == 'onceit':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('body').get('count'), self.api_provider))
                 elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s products from your %s account!' % (response.get('HitsTotal'), self.api_provider))
@@ -159,6 +178,8 @@ class MarketPlaceConfigDetails(models.Model):
                 if self.api_provider == 'tradevine':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('TotalCount'), self.api_provider))
                 elif self.api_provider == 'kogan':
+                    msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('body').get('count'), self.api_provider))
+                elif self.api_provider == 'onceit':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('body').get('count'), self.api_provider))
                 elif self.api_provider == 'themarket':
                     msg = _('Successfully Imported %s sale order from your %s account!' % (response.get('HitsTotal'), self.api_provider))

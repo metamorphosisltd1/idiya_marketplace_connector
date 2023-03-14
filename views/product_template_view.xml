@@ -32,6 +32,13 @@
                     <field name="kogan_category_id"/>
                 </group> 
             </xpath>
+
+            <!-- Onceit -->
+            <xpath expr="//group[@name='kogan']" position="after">
+                <group name="onceit" string="Onceit">
+                    <field name="onceit_category_id"/>
+                </group> 
+            </xpath>
             
             <xpath expr="//notebook" position="inside">
                 <page string="Marketplace Config" name="marketplace_config_ids">
